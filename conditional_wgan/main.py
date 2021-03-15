@@ -7,17 +7,20 @@ import sys
 
 import torch
 from torch import tensor
+from torch import random
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.autograd as autograd
 
-import torchvision.transforms as transforms
+import random
+import torchvision.transforms as transform
 from torchvision.utils import save_image
 # from torch.utils.data import DataLoader, dataloader
-# from torchvision import datasets
+from torchvision import datasets
 
 import models.mlp as mlp
 import dataset.dataset as dst
+import models.dcgan as dcgan
 
 from torch.utils.tensorboard import SummaryWriter
 # %%
@@ -29,22 +32,28 @@ writer = SummaryWriter('runs/c_wgan')
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=150, help="number of epochs of training")
 parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
-parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
+parser.add_argument("--lr", type=float, default=0.00005, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
 parser.add_argument("--latent_dim", type=int, default=100, help="dimensionality of the latent space")
-parser.add_argument("--img_size", type=int, default=28, help="size of each image dimension")
+parser.add_argument("--img_size", type=int, default=32, help="size of each image dimension")
 parser.add_argument("--channels", type=int, default=1, help="number of image channels")
 parser.add_argument("--n_critic", type=int, default=5, help="number of training steps for discriminator per iter")
 parser.add_argument("--clip_value", type=float, default=0.01, help="lower and upper clip value for disc. weights")
 parser.add_argument("--sample_interval", type=int, default=400, help="interval betwen image samples")
+parser.add_argument("--dcgan", action='store_false', help='use MLP')
 parser.add_argument("--dataset", type=str, choices=['mnist', 'fashion'],
                     default='mnist', help="dataset to use")
 opt = parser.parse_args([])
 print(opt)
 # %%
 opt.img_shape = (opt.channels, opt.img_size, opt.img_size)
+
+opt.manualSeed = random.randint(1, 10000) # fix seed 
+print("Random seed: ", opt.manualSeed)
+random.seed(opt.manualSeed)
+torch.manual_seed(opt.manualSeed)
 
 cuda = True if torch.cuda.is_available() else False
 opt.n_classes = 10
@@ -53,12 +62,21 @@ opt.n_classes = 10
 lambda_gp = 10
 
 # init g and d
-generator = mlp.Generator(opt)
-discriminator = mlp.Discriminator(opt)
+if not opt.dcgan:
+    generator = mlp.Generator(opt)
+    discriminator = mlp.Discriminator(opt)
+else:
+    generator = dcgan.DCGAN_G(opt)
+    discriminator = dcgan.DCGAN_D(opt)
+    generator.apply(dcgan.weights_init)
+    discriminator.apply(dcgan.weights_init)
 
 if cuda:
     generator.cuda()
     discriminator.cuda()
+
+print(generator)
+print(discriminator)
 # %%
 # configure data loader 
 dataloader = dst.getdDataset(opt)
@@ -114,7 +132,7 @@ for epoch in range(opt.n_epochs):
 
         # to GPU
         real_imgs = imgs.type(Tensor)
-        labels = labels.type(LongTensor)
+        labels = labels.type(LongTensor).view(opt.batch_size, -1, 1, 1)
 
         # save real img
         save_image(real_imgs.data, 'images/c_wgan/real_image.png', nrow=opt.n_classes, normalize=True)
@@ -125,7 +143,7 @@ for epoch in range(opt.n_epochs):
         optimizer_D.zero_grad()
 
         # sample noise and labels as generator input
-        z = Tensor(np.random.normal(0, 1, (imgs.shape[0], opt.latent_dim)))
+        z = Tensor(np.random.normal(0, 1, (imgs.shape[0], opt.latent_dim, 1, 1)))
 
         # generate a batch of images 
         fake_imgs = generator(z, labels)

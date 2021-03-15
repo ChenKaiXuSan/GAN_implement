@@ -350,7 +350,8 @@ MigrationBackup/
 .ionide/
 
 # 自己写的
-images/
 runs/
 data/
-.vscode/
+images/
+
+.vscode
