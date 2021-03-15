@@ -10,7 +10,7 @@ def getdDataset(opt):
     dst = datasets.MNIST(
         '../data/mnist',
         train=True,
-        download=False,
+        download=True,
         transform=transform.Compose(
             [transform.Resize(opt.img_size), transform.ToTensor(), transform.Normalize([0.5], [0.5])]
         )

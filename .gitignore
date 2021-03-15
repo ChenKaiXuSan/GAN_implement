@@ -353,3 +353,4 @@ MigrationBackup/
 images/
 runs/
 data/
+.vscode/

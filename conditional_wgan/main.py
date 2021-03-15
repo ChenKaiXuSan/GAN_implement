@@ -16,15 +16,15 @@ from torchvision.utils import save_image
 # from torch.utils.data import DataLoader, dataloader
 # from torchvision import datasets
 
-import model.mlp as mlp
+import models.mlp as mlp
 import dataset.dataset as dst
 
 from torch.utils.tensorboard import SummaryWriter
 # %%
-os.makedirs('images', exist_ok=True)
+os.makedirs('images/c_wgan', exist_ok=True)
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-writer = SummaryWriter()
+writer = SummaryWriter('runs/c_wgan')
 # %%
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=150, help="number of epochs of training")
@@ -79,7 +79,7 @@ def sample_image(n_row, batches_done):
     with torch.no_grad():
         labels = LongTensor(labels)
         gen_imgs = generator(z, labels)
-    save_image(gen_imgs.data, 'images/%d.png' % batches_done, nrow=n_row, normalize=True)
+    save_image(gen_imgs.data, 'images/c_wgan/%d.png' % batches_done, nrow=n_row, normalize=True)
 # %%
 def compute_gradient_penalty(D, real_samples, fake_samples, labels):
      # Random weight term for interpolation between real and fake samples
@@ -117,7 +117,7 @@ for epoch in range(opt.n_epochs):
         labels = labels.type(LongTensor)
 
         # save real img
-        save_image(real_imgs.data, 'images/real_image.png', nrow=opt.n_classes, normalize=True)
+        save_image(real_imgs.data, 'images/c_wgan/real_image.png', nrow=opt.n_classes, normalize=True)
         # ---------------------
         #  Train Discriminator
         # ---------------------
