@@ -6,17 +6,19 @@ from __future__ import unicode_literals
 import torch
 import torch.nn as nn
 import torch.nn.parallel
+import numpy as np
 
 class DCGAN_D(nn.Module):
     def __init__(self, opt):
         super(DCGAN_D, self).__init__()
 
         self.label_embedding = nn.Embedding(opt.n_classes, opt.n_classes)
+        self.opt = opt
 
         main = nn.Sequential()
         # input is nc x isize x isize
-        main.add_module('initial:{0}-{1}:conv'.format(opt.latent_dim, 64),
-                        nn.Conv2d(opt.latent_dim, 64, 4, 2, 1, bias=False))
+        main.add_module('initial:{0}-{1}:conv'.format(opt.n_classes + 1, 64),
+                        nn.Conv2d(opt.n_classes + 1, 64, 4, 2, 1, bias=False))
         main.add_module('initial:{0}:relu'.format(64),
                         nn.LeakyReLU(0.2, inplace=True))
         csize, cndf = opt.img_size / 2, 64
@@ -47,9 +49,16 @@ class DCGAN_D(nn.Module):
                         nn.Conv2d(cndf, 1, 4, 1, 0, bias=False))
         self.main = main
 
+        self.fill = torch.zeros([10, 10, opt.img_size, opt.img_size])
+        for i in range(10):
+            self.fill[i, i, :, :] = 1
+        self.fill.cuda()
+
+    
 
     def forward(self, img, labels):
-        d_in = torch.cat((img.view(img.size(0), -1), self.label_embedding(labels)), -1)
+        labels_fill = self.fill[labels].cuda()
+        d_in = torch.cat((img, labels_fill), 1)
         output = self.main(d_in)
         return output
 
@@ -105,7 +114,8 @@ class DCGAN_G(nn.Module):
         self.main = main
 
     def forward(self, z, labels):
-        gen_input = torch.cat((self.label_emb(labels), z), -1)
+        labels_emb = self.label_emb(labels)
+        gen_input = torch.cat((labels_emb, z), -1).view(z.size(0), -1, 1, 1)
         # labels = self.label_emb(labels).view(opt.batch_size, 110, 1, 1)
         # gen_input = torch.cat((z, self.label_emb(labels)), -1 )
 

@@ -13,10 +13,20 @@ from torchvision import datasets
 # %%
 def getdDataset(opt):
 
-    dst = datasets.MNIST(
-        '../data/mnist',
+    # dst = datasets.MNIST(
+    #     '../data/mnist/',
+    #     train=True,
+    #     download=True,
+    #     transform=transform.Compose(
+    #         [transform.Resize(opt.img_size), transform.ToTensor(), transform.Normalize([0.5], [0.5])]
+    #     )
+    # )
+
+    dst = datasets.FashionMNIST(
+        '../data/',
         train=True,
         download=True,
+        # split='mnist',
         transform=transform.Compose(
             [transform.Resize(opt.img_size), transform.ToTensor(), transform.Normalize([0.5], [0.5])]
         )

@@ -98,6 +98,7 @@ def sample_image(n_row, batches_done):
         labels = LongTensor(labels)
         gen_imgs = generator(z, labels)
     save_image(gen_imgs.data, 'images/c_wgan/%d.png' % batches_done, nrow=n_row, normalize=True)
+    
 # %%
 def compute_gradient_penalty(D, real_samples, fake_samples, labels):
      # Random weight term for interpolation between real and fake samples
@@ -106,7 +107,7 @@ def compute_gradient_penalty(D, real_samples, fake_samples, labels):
     # Get random interpolation between real and fake samples
     interpolates = (alpha * real_samples + ((1 - alpha) * fake_samples)).requires_grad_(True)
     d_interpolates = D(interpolates, labels)
-    fake = Tensor(real_samples.shape[0], 1).fill_(1.0)
+    fake = Tensor(real_samples.shape[0], 1, 1, 1).fill_(1.0)
     fake.requires_grad = False
     # Get gradient w.r.t. interpolates
     gradients = autograd.grad(
@@ -132,8 +133,7 @@ for epoch in range(opt.n_epochs):
 
         # to GPU
         real_imgs = imgs.type(Tensor)
-        labels = labels.type(LongTensor).view(opt.batch_size, -1, 1, 1)
-
+        labels = labels.type(LongTensor)
         # save real img
         save_image(real_imgs.data, 'images/c_wgan/real_image.png', nrow=opt.n_classes, normalize=True)
         # ---------------------
@@ -143,7 +143,7 @@ for epoch in range(opt.n_epochs):
         optimizer_D.zero_grad()
 
         # sample noise and labels as generator input
-        z = Tensor(np.random.normal(0, 1, (imgs.shape[0], opt.latent_dim, 1, 1)))
+        z = Tensor(np.random.normal(0, 1, (imgs.shape[0], opt.latent_dim)))
 
         # generate a batch of images 
         fake_imgs = generator(z, labels)
