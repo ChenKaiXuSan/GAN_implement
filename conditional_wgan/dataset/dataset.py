@@ -15,7 +15,8 @@ def getdDataset(opt):
 
     if opt.dataset == 'mnist':
         dst = datasets.MNIST(
-            '../../data/',
+            # 相对路径，以调用的文件位置为准
+            '../data/mnist',
             train=True,
             download=True,
             transform=transform.Compose(
@@ -24,7 +25,7 @@ def getdDataset(opt):
         )
     elif opt.dataset == 'fashion':
         dst = datasets.FashionMNIST(
-            '../../data/',
+            '../data/',
             train=True,
             download=True,
             # split='mnist',
