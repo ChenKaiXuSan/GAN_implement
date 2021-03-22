@@ -16,7 +16,7 @@ def getdDataset(opt):
     if opt.dataset == 'mnist':
         dst = datasets.MNIST(
             # 相对路径，以调用的文件位置为准
-            '../data/mnist',
+            root=opt.dataroot,
             train=True,
             download=True,
             transform=transform.Compose(
@@ -25,10 +25,19 @@ def getdDataset(opt):
         )
     elif opt.dataset == 'fashion':
         dst = datasets.FashionMNIST(
-            '../data/',
+            root=opt.dataroot,
             train=True,
             download=True,
             # split='mnist',
+            transform=transform.Compose(
+                [transform.Resize(opt.img_size), transform.ToTensor(), transform.Normalize([0.5], [0.5])]
+            )
+        )
+    elif opt.dataset == 'cifar10':
+        dst = datasets.CIFAR10(
+            root=opt.dataroot,
+            train=True,
+            download=True,
             transform=transform.Compose(
                 [transform.Resize(opt.img_size), transform.ToTensor(), transform.Normalize([0.5], [0.5])]
             )
@@ -49,8 +58,9 @@ import numpy as np
 
 if __name__ == "__main__":
     class opt:
-        dataset = 'mnist'
-        img_size = 32
+        dataroot = '../../data'
+        dataset = 'cifar10'
+        img_size = 64
         batch_size = 10
 
     dataloader = getdDataset(opt)

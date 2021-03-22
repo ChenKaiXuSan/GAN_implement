@@ -17,8 +17,8 @@ class DCGAN_D(nn.Module):
 
         main = nn.Sequential()
         # input is nc x isize x isize
-        main.add_module('initial:{0}-{1}:conv'.format(opt.n_classes + 1, 64),
-                        nn.Conv2d(opt.n_classes + 1, 64, 4, 2, 1, bias=False))
+        main.add_module('initial:{0}-{1}:conv'.format(opt.n_classes + opt.channels, 64),
+                        nn.Conv2d(opt.n_classes + opt.channels, 64, 4, 2, 1, bias=False))
         main.add_module('initial:{0}:relu'.format(64),
                         nn.LeakyReLU(0.2, inplace=True))
         csize, cndf = opt.img_size / 2, 64
