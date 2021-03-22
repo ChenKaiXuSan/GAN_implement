@@ -25,7 +25,7 @@ import models.dcgan as dcgan
 from torch.utils.tensorboard import SummaryWriter
 # %%
 os.makedirs('images/', exist_ok=True)
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import shutil
 shutil.rmtree('runs/')
