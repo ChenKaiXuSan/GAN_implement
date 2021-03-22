@@ -54,8 +54,6 @@ class DCGAN_D(nn.Module):
             self.fill[i, i, :, :] = 1
         self.fill.cuda()
 
-    
-
     def forward(self, img, labels):
         labels_fill = self.fill[labels].cuda()
         d_in = torch.cat((img, labels_fill), 1)
@@ -123,8 +121,15 @@ class DCGAN_G(nn.Module):
         output = output.view(output.shape[0], * self.opt.img_shape)
         return output 
 
+
 # custom weights initialization called on netG and netD
 def weights_init(m):
+    '''
+    初始化conv参数
+
+    Args:
+        m (layer): layer名字
+    '''    
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
         m.weight.data.normal_(0.0, 0.02)

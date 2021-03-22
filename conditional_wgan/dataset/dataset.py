@@ -8,29 +8,30 @@ from __future__ import unicode_literals
 import torch
 import torchvision.transforms as transform
 from torchvision.utils import save_image
-from torch.utils.data import DataLoader, dataloader
+from torch.utils.data import DataLoader
 from torchvision import datasets
 # %%
 def getdDataset(opt):
 
-    # dst = datasets.MNIST(
-    #     '../data/mnist/',
-    #     train=True,
-    #     download=True,
-    #     transform=transform.Compose(
-    #         [transform.Resize(opt.img_size), transform.ToTensor(), transform.Normalize([0.5], [0.5])]
-    #     )
-    # )
-
-    dst = datasets.FashionMNIST(
-        '../data/',
-        train=True,
-        download=True,
-        # split='mnist',
-        transform=transform.Compose(
-            [transform.Resize(opt.img_size), transform.ToTensor(), transform.Normalize([0.5], [0.5])]
+    if opt.dataset == 'mnist':
+        dst = datasets.MNIST(
+            '../../data/',
+            train=True,
+            download=True,
+            transform=transform.Compose(
+                [transform.Resize(opt.img_size), transform.ToTensor(), transform.Normalize([0.5], [0.5])]
+            )
         )
-    )
+    elif opt.dataset == 'fashion':
+        dst = datasets.FashionMNIST(
+            '../../data/',
+            train=True,
+            download=True,
+            # split='mnist',
+            transform=transform.Compose(
+                [transform.Resize(opt.img_size), transform.ToTensor(), transform.Normalize([0.5], [0.5])]
+            )
+        )
 
     dataloader = DataLoader(
         dst,
@@ -39,3 +40,30 @@ def getdDataset(opt):
     )
 
     return dataloader
+
+# %%
+from torchvision.utils import make_grid
+import matplotlib.pyplot as plt
+import numpy as np
+
+if __name__ == "__main__":
+    class opt:
+        dataset = 'mnist'
+        img_size = 32
+        batch_size = 10
+
+    dataloader = getdDataset(opt)
+    for i, (imgs, labels) in enumerate(dataloader):
+        print(i, imgs.shape, labels.shape)
+        print(labels)
+
+        img = imgs[0]
+        img = img.numpy()
+        img = make_grid(imgs, normalize=True).numpy()
+        img = np.transpose(img, (1, 2, 0))
+
+        plt.imshow(img)
+        plt.show()
+        plt.close()
+        break
+# %%

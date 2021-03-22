@@ -24,9 +24,11 @@ import models.dcgan as dcgan
 
 from torch.utils.tensorboard import SummaryWriter
 # %%
-os.makedirs('images/c_wgan', exist_ok=True)
+os.makedirs('images/', exist_ok=True)
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
+import shutil
+shutil.rmtree('runs/')
 writer = SummaryWriter('runs/c_wgan')
 # %%
 parser = argparse.ArgumentParser()
@@ -56,6 +58,7 @@ random.seed(opt.manualSeed)
 torch.manual_seed(opt.manualSeed)
 
 cuda = True if torch.cuda.is_available() else False
+
 opt.n_classes = 10
 # %%
 # loss weight for gradient penalty
@@ -89,7 +92,16 @@ Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 LongTensor = torch.cuda.LongTensor if cuda else torch.LongTensor
 
 # %%
+
 def sample_image(n_row, batches_done):
+    '''
+    用训练好的G来生成图片，保存用
+
+    Args:
+        n_row (int): 生成图片的列数
+        batches_done (int): 图片批次
+    '''    
+
     # sample noise
     z = Tensor(np.random.normal(0, 1, (n_row ** 2, opt.latent_dim)))
     # get labels ranging from 0 to n_classes for n rows 
@@ -98,9 +110,19 @@ def sample_image(n_row, batches_done):
         labels = LongTensor(labels)
         gen_imgs = generator(z, labels)
     save_image(gen_imgs.data, 'images/c_wgan/%d.png' % batches_done, nrow=n_row, normalize=True)
-    
+
 # %%
 def compute_gradient_penalty(D, real_samples, fake_samples, labels):
+    '''
+    计算gp惩罚
+
+    Args:
+        D (D): 传入的D
+        real_samples (tensor): 真实样本
+        fake_samples (tensor): 假的样本
+        labels (tensor): 标签
+    '''
+
      # Random weight term for interpolation between real and fake samples
     alpha = Tensor(np.random.random((real_samples.size(0), 1, 1, 1)))
     labels = LongTensor(labels)
@@ -121,6 +143,7 @@ def compute_gradient_penalty(D, real_samples, fake_samples, labels):
     gradients = gradients[0].view(gradients[0].size(0), -1)
     gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
     return gradient_penalty
+
 # %%
 # ----------
 #  Training
@@ -176,9 +199,9 @@ for epoch in range(opt.n_epochs):
             #  Train Generator
             # -----------------
 
-
             # generate a batch of images 
             fake_imgs = generator(z, labels)
+
             # loss measures generator's ability to fool the discriminator
             # train on fake images 
             fake_validity = discriminator(fake_imgs, labels)
