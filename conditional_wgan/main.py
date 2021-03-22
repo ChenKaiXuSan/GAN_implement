@@ -19,12 +19,16 @@ from torchvision.utils import save_image
 from torchvision import datasets
 
 import models.mlp as mlp
+
 import dataset.dataset as dst
 import models.dcgan as dcgan
 
 from torch.utils.tensorboard import SummaryWriter
 # %%
+# 保存生成图片
 os.makedirs('images/', exist_ok=True)
+# 保存真实图片
+os.makedirs('images/c_wgan/real_image/', exist_ok=True)
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import shutil
@@ -40,7 +44,7 @@ parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of firs
 parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
 parser.add_argument("--latent_dim", type=int, default=100, help="dimensionality of the latent space")
 parser.add_argument("--img_size", type=int, default=32, help="size of each image dimension")
-parser.add_argument("--channels", type=int, default=1, help="number of image channels")
+parser.add_argument("--channels", type=int, default=3, help="number of image channels")
 parser.add_argument("--n_critic", type=int, default=5, help="number of training steps for discriminator per iter")
 parser.add_argument("--clip_value", type=float, default=0.01, help="lower and upper clip value for disc. weights")
 parser.add_argument("--sample_interval", type=int, default=400, help="interval betwen image samples")
@@ -222,7 +226,7 @@ for epoch in range(opt.n_epochs):
 
             if batches_done % opt.sample_interval == 0:
                 # save real img
-                save_image(real_imgs.data, 'images/c_wgan/real_image/real_image_%d.png'% batches_done, nrow=opt.batch_size ** 0.5, normalize=True)
+                save_image(real_imgs.data, 'images/c_wgan/real_image/real_image_%d.png'% batches_done, nrow=int(opt.batch_size ** 0.5), normalize=True)
                 sample_image(opt.n_classes, batches_done)
 
             batches_done += opt.n_critic
