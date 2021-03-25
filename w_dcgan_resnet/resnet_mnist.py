@@ -13,3 +13,9 @@ from torch.autograd import Variable
 from sklearn.model_selection import train_test_split
 
 # %%
+# prepare dataset 
+train = pd.read_csv(r"input/train.csv", dtype=np.float32)
+
+targets_numpy = train.label.values
+features_numpy = train.loc[:,train.columns != "label"].values/255
+
