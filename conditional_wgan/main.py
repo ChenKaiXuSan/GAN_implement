@@ -15,7 +15,7 @@ import torch.autograd as autograd
 import random
 import torchvision.transforms as transform
 from torchvision.utils import save_image
-# from torch.utils.data import DataLoader, dataloader
+from torch.utils.data import DataLoader, dataloader
 from torchvision import datasets
 
 import models.mlp as mlp
