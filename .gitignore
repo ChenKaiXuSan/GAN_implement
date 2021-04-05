@@ -362,3 +362,6 @@ images/
 *.code-workspace
 
 conditional_wgan/paper/
+
+self_attention_gan/logs
+self_attention_gan/samples 

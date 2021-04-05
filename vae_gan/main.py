@@ -93,20 +93,20 @@ def train_batch(x_r):
     # ---------------------
     #  Train G and E
     # ---------------------
-
-    # loss to -log(D(G(z_p)))
-    loss_GD = F.binary_cross_entropy(ld_p, y_real)
-    # pixel wise matching loss and discriminator's feature matching loss
-    x_r.requires_grad_(True)
-    loss_G = 0.5 * (0.01 * (x_f - x_r).pow(2).sum() + (fd_f - fd_r.detach()).pow(2).sum()) / batch_size
-
-    loss_G.backward()
+    with torch.autograd.set_detect_anomaly(True):
+        # loss to -log(D(G(z_p)))
+        y_real.requires_grad_(True)
+        loss_GD = F.binary_cross_entropy(ld_p, y_real)
+        # pixel wise matching loss and discriminator's feature matching loss
+        loss_G = 0.5 * (0.01 * (x_f - x_r).pow(2).sum() + (fd_f - fd_r.detach()).pow(2).sum()) / batch_size
+        loss_G.requires_grad_(True)
+        loss_G.backward()
 
     optimizer_E.zero_grad()
     optimizer_G.zero_grad()
 
     loss = opt.w_kld * kld + opt.w_loss_g * loss_G + opt.w_loss_gd * loss_GD
-
+    loss.requires_grad_(True)
     loss.backward()
     optimizer_E.step()
     optimizer_G.step()
