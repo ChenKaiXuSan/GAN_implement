@@ -194,3 +194,7 @@ class Trainer(object):
     def reset_grad(self):
         self.d_optimizer.zero_grad()
         self.g_optimizer.zero_grad()
+
+    def save_sample(self, data_iter):
+        real_images, _ = next(data_iter)
+        save_image(denorm(real_images). os.path.join(self.sample_path, 'real.png'))
