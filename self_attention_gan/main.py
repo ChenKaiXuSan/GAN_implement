@@ -1,6 +1,6 @@
 # %%
 import sys
-# sys.path.append('..')
+sys.path.append('..')
 sys.path.append('.')
 
 from self_attention_gan.trainer import Trainer
@@ -50,10 +50,10 @@ def get_parameters():
 
     # Path
     parser.add_argument('--dataroot', type=str, default='../data')
-    parser.add_argument('--log_path', type=str, default='.logs')
-    parser.add_argument('--model_save_path', type=str, default='.models')
-    parser.add_argument('--sample_path', type=str, default='.samples')
-    parser.add_argument('--attn_path', type=str, default='.attn')
+    parser.add_argument('--log_path', type=str, default='self_attention_gan/logs')
+    parser.add_argument('--model_save_path', type=str, default='self_attention_gan/models')
+    parser.add_argument('--sample_path', type=str, default='self_attention_gan/samples')
+    parser.add_argument('--attn_path', type=str, default='self_attention_gan/attn')
 
     # Step size
     parser.add_argument('--log_step', type=int, default=10)
@@ -72,7 +72,7 @@ def main(config):
     make_folder(config.sample_path, config.version)
     make_folder(config.log_path, config.version)
     make_folder(config.attn_path, config.version)
-    make_folder(config.sample_path + '/real_images', config.version)
+    make_folder(config.sample_path, config.version + '/real_images')
 
     if config.train:
         if config.model == 'sagan':

@@ -172,10 +172,9 @@ class Trainer(object):
                              self.total_step , d_loss_real.item(),
                              self.G.attn1.gamma.mean().item(), self.G.attn2.gamma.mean().item() ))
 
-            self.save_sample(data_iter, step)
-
             # sample images 
             if (step + 1) % self.sample_step == 0:
+                self.save_sample(real_images, step)
                 fake_images, _, _ = self.G(fixed_z)
                 save_image(denorm(fake_images.data),
                             os.path.join(self.sample_path, '{}_fake.png'.format(step + 1)))
@@ -205,7 +204,7 @@ class Trainer(object):
         self.d_optimizer.zero_grad()
         self.g_optimizer.zero_grad()
 
-    def save_sample(self, data_iter, step):
-        real_images, _ = next(data_iter)
+    def save_sample(self, real_images, step):
+        # real_images, _ = next(data_iter)
         path = self.sample_path + '/real_images'
         save_image(denorm(real_images.data), os.path.join(path, '{}_real.png'.format(step + 1)))
