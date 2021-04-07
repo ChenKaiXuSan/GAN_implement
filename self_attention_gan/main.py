@@ -1,7 +1,7 @@
 # %%
 import sys
+# sys.path.append('..')
 sys.path.append('.')
-sys.path.append('..')
 
 from self_attention_gan.trainer import Trainer
 from self_attention_gan.utils.utils import *
@@ -20,6 +20,7 @@ def get_parameters():
     parser.add_argument('--model', type=str, default='sagan', choices=['sagan', 'qgan'])
     parser.add_argument('--adv_loss', type=str, default='wgan-gp', choices=['wgan-gp', 'hinge'])
     parser.add_argument('--img_size', type=int, default=64)
+    parser.add_argument('--channels', type=int, default=1, help='number of image channels')
     parser.add_argument('--g_num', type=int, default=5)
     parser.add_argument('--z_dim', type=int, default=128)
     parser.add_argument('--g_conv_dim', type=int, default=64)
@@ -28,7 +29,7 @@ def get_parameters():
     parser.add_argument('--version', type=str, default='sagan_1')
 
     # Training setting
-    parser.add_argument('--total_step', type=int, default=1000000, help='how many times to update the generator')
+    parser.add_argument('--total_step', type=int, default=1000, help='how many times to update the generator')
     parser.add_argument('--d_iters', type=float, default=5)
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--num_workers', type=int, default=2)
@@ -44,15 +45,15 @@ def get_parameters():
     # Misc
     parser.add_argument('--train', type=str2bool, default=True)
     parser.add_argument('--parallel', type=str2bool, default=False)
-    parser.add_argument('--dataset', type=str, default='cifar10', choices=['lsun', 'celeb'])
-    parser.add_argument('--use_tensorboard', type=str2bool, default=False)
+    parser.add_argument('--dataset', type=str, default='fashion', choices=['mnist', 'cifar10', 'fashion'])
+    parser.add_argument('--use_tensorboard', type=str2bool, default=True)
 
     # Path
     parser.add_argument('--dataroot', type=str, default='../data')
-    parser.add_argument('--log_path', type=str, default='./logs')
-    parser.add_argument('--model_save_path', type=str, default='./models')
-    parser.add_argument('--sample_path', type=str, default='./samples')
-    parser.add_argument('--attn_path', type=str, default='./attn')
+    parser.add_argument('--log_path', type=str, default='.logs')
+    parser.add_argument('--model_save_path', type=str, default='.models')
+    parser.add_argument('--sample_path', type=str, default='.samples')
+    parser.add_argument('--attn_path', type=str, default='.attn')
 
     # Step size
     parser.add_argument('--log_step', type=int, default=10)
@@ -71,6 +72,7 @@ def main(config):
     make_folder(config.sample_path, config.version)
     make_folder(config.log_path, config.version)
     make_folder(config.attn_path, config.version)
+    make_folder(config.sample_path + '/real_images', config.version)
 
     if config.train:
         if config.model == 'sagan':

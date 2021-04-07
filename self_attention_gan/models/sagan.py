@@ -63,10 +63,11 @@ class Generator(nn.Module):
     Generator
 
     '''
-    def __init__(self, batch_size, image_size=64, z_dim=100, conv_dim=64):
+    def __init__(self, batch_size, image_size=64, z_dim=100, conv_dim=64, channels = 1):
         
         super(Generator, self).__init__()
         self.imsize = image_size
+        self.channels = channels
 
         layer1 = []
         layer2 = []
@@ -106,7 +107,7 @@ class Generator(nn.Module):
         self.l2 = nn.Sequential(*layer2)
         self.l3 = nn.Sequential(*layer3)
 
-        last.append(nn.ConvTranspose2d(curr_dim, 3, 4, 2, 1))
+        last.append(nn.ConvTranspose2d(curr_dim, self.channels, 4, 2, 1))
         last.append(nn.Tanh())
         self.last = nn.Sequential(*last)
 
@@ -132,15 +133,16 @@ class Discriminator(nn.Module):
     discriminator, Auxiliary classifier
 
     '''
-    def __init__(self, batch_size = 64, image_size = 64, conv_dim = 64):
+    def __init__(self, batch_size = 64, image_size = 64, conv_dim = 64, channels = 1):
         super(Discriminator, self).__init__()
         self.imsize = image_size
+        self.channels = channels
         layer1 = []
         layer2 = []
         layer3 = []
         last = []
 
-        layer1.append(SpectralNorm(nn.Conv2d(3, conv_dim, 4, 2, 1)))
+        layer1.append(SpectralNorm(nn.Conv2d(self.channels, conv_dim, 4, 2, 1)))
         layer1.append(nn.LeakyReLU(0.1))
 
         curr_dim = conv_dim

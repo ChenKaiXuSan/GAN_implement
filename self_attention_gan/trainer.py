@@ -1,6 +1,7 @@
 # %% 
 import os 
 import time
+from matplotlib.pyplot import step
 import torch
 import datetime
 
@@ -31,6 +32,7 @@ class Trainer(object):
         self.imsize = config.img_size 
         self.g_num = config.g_num
         self.z_dim = config.z_dim
+        self.channels = config.channels
         self.g_conv_dim = config.g_conv_dim
         self.d_conv_dim = config.d_conv_dim
         self.parallel = config.parallel
@@ -114,6 +116,8 @@ class Trainer(object):
             d_loss.backward()
             self.d_optimizer.step()
 
+            self.logger.add_scalar('d_loss_real', d_loss, step)
+
             if self.adv_loss == 'wgan-gp':
                 # compute gradient penalty
                 alpha = torch.rand(real_images.size(0), 1, 1, 1).cuda().expand_as(real_images)
@@ -140,6 +144,8 @@ class Trainer(object):
                 d_loss.backward()
                 self.d_optimizer.step()
 
+                self.logger.add_scalar('d_loss', d_loss, step)
+
             # =================== Train G and gumbel =====================
             # create random noise 
             z = tensor2var(torch.randn(real_images.size(0), self.z_dim))
@@ -154,6 +160,8 @@ class Trainer(object):
             g_loss_fake.backward()
             self.g_optimizer.step()
 
+            self.logger.add_scalar('g_loss_fake', g_loss_fake, step)
+
             # print out log info
             if (step + 1) % self.log_step == 0:
                 elapsed = time.time() - start_time
@@ -163,6 +171,8 @@ class Trainer(object):
                       format(elapsed, step + 1, self.total_step, (step + 1),
                              self.total_step , d_loss_real.item(),
                              self.G.attn1.gamma.mean().item(), self.G.attn2.gamma.mean().item() ))
+
+            self.save_sample(data_iter, step)
 
             # sample images 
             if (step + 1) % self.sample_step == 0:
@@ -174,8 +184,8 @@ class Trainer(object):
 
     def build_model(self):
 
-        self.G = Generator(self.batch_size, self.imsize, self.z_dim, self.g_conv_dim).cuda()
-        self.D = Discriminator(self.batch_size, self.imsize, self.d_conv_dim).cuda()
+        self.G = Generator(self.batch_size, self.imsize, self.z_dim, self.g_conv_dim, self.channels).cuda()
+        self.D = Discriminator(self.batch_size, self.imsize, self.d_conv_dim, self.channels).cuda()
         
         # loss and optimizer 
         self.g_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.G.parameters()), self.g_lr, [self.beta1, self.beta2])
@@ -195,6 +205,7 @@ class Trainer(object):
         self.d_optimizer.zero_grad()
         self.g_optimizer.zero_grad()
 
-    def save_sample(self, data_iter):
+    def save_sample(self, data_iter, step):
         real_images, _ = next(data_iter)
-        save_image(denorm(real_images). os.path.join(self.sample_path, 'real.png'))
+        path = self.sample_path + '/real_images'
+        save_image(denorm(real_images.data), os.path.join(path, '{}_real.png'.format(step + 1)))

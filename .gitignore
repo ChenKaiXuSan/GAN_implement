@@ -355,7 +355,6 @@ data/
 images/
 
 .vscode/*
-!.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
@@ -365,3 +364,4 @@ conditional_wgan/paper/
 
 self_attention_gan/logs
 self_attention_gan/samples 
+.vscode/settings.json

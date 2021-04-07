@@ -59,7 +59,7 @@ import numpy as np
 if __name__ == "__main__":
     class opt:
         dataroot = '../../data'
-        dataset = 'cifar10'
+        dataset = 'mnist'
         img_size = 32
         batch_size = 10
 
