@@ -60,7 +60,7 @@ if __name__ == "__main__":
     class opt:
         dataroot = '../../data'
         dataset = 'cifar10'
-        img_size = 64
+        img_size = 32
         batch_size = 10
 
     dataloader = getdDataset(opt)
