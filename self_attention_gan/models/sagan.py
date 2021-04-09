@@ -1,7 +1,12 @@
 # %%
+from numpy.lib import utils
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+import sys
+sys.path.append('../..')
+sys.path.append('./')
 
 from torch.autograd import Variable
 from self_attention_gan.models.spectral import SpectralNorm
@@ -58,16 +63,25 @@ class Self_Attn(nn.Module):
         out = self.gamma * out + x
         return out, attention
 # %%
+def fill_labels(img_size):
+    fill = torch.zeros([10, 10, img_size, img_size])
+    for i in range(10):
+        fill[i, i, :, :] = 1
+    return fill.cuda()
+
+# %%
 class Generator(nn.Module):
     '''
     Generator
 
     '''
-    def __init__(self, batch_size, image_size=64, z_dim=100, conv_dim=64, channels = 1):
+    def __init__(self, batch_size, image_size=64, z_dim=100, conv_dim=64, channels = 1, n_classes = 10):
         
         super(Generator, self).__init__()
         self.imsize = image_size
         self.channels = channels
+        self.n_classes = n_classes
+        self.label_emb = nn.Embedding(n_classes, n_classes, 1, 1).cuda()
 
         layer1 = []
         layer2 = []
@@ -77,7 +91,7 @@ class Generator(nn.Module):
         repeat_num = int(np.log2(self.imsize)) - 3  # 3
         mult = 2 ** repeat_num  # 8
         layer1.append(SpectralNorm(
-            nn.ConvTranspose2d(z_dim, conv_dim * mult, 4)))
+            nn.ConvTranspose2d(z_dim + self.n_classes, conv_dim * mult, 4)))
         layer1.append(nn.BatchNorm2d(conv_dim * mult))
         layer1.append(nn.ReLU())
 
@@ -114,9 +128,15 @@ class Generator(nn.Module):
         self.attn1 = Self_Attn(128, 'relu')
         self.attn2 = Self_Attn(64, 'relu')
 
-    def forward(self, z):
-        z = z.view(z.size(0), z.size(1), 1, 1)
-        out = self.l1(z)
+    def forward(self, z, labels):
+
+        labels_emb = self.label_emb(labels).cuda()
+
+        z = z.view(z.size(0), z.size(1))
+        
+        input = torch.cat((labels_emb, z), 1)
+        input = input.view(input.size(0), input.size(1), 1, 1)
+        out = self.l1(input)
         out = self.l2(out)
         out = self.l3(out)
         out, p1 = self.attn1(out)
@@ -133,16 +153,17 @@ class Discriminator(nn.Module):
     discriminator, Auxiliary classifier
 
     '''
-    def __init__(self, batch_size = 64, image_size = 64, conv_dim = 64, channels = 1):
+    def __init__(self, batch_size, n_classes = 10, image_size = 64, conv_dim = 64, channels = 1):
         super(Discriminator, self).__init__()
         self.imsize = image_size
         self.channels = channels
+        self.n_classes = n_classes
         layer1 = []
         layer2 = []
         layer3 = []
         last = []
 
-        layer1.append(SpectralNorm(nn.Conv2d(self.channels, conv_dim, 4, 2, 1)))
+        layer1.append(SpectralNorm(nn.Conv2d(self.channels + self.n_classes , conv_dim, 4, 2, 1)))
         layer1.append(nn.LeakyReLU(0.1))
 
         curr_dim = conv_dim
@@ -174,8 +195,10 @@ class Discriminator(nn.Module):
         self.attn1 = Self_Attn(256, 'relu')
         self.attn2 = Self_Attn(512, 'relu')
 
-    def forward(self, x):
-        out = self.l1(x)
+    def forward(self, x, labels):
+        labels_fill = fill_labels(self.imsize)[labels] # 10, 10, img_size, img_size torch.cuda.floattensor
+        input = torch.cat((x, labels_fill), 1) # torch.cuda.floattensor
+        out = self.l1(input)
         out = self.l2(out)
         out = self.l3(out)
         out, p1 = self.attn1(out)
@@ -187,13 +210,23 @@ class Discriminator(nn.Module):
 
 # %% 
 if __name__ == '__main__':
-    genertor = Generator(64)
-    discriminator = Discriminator(6)
+    genertor = Generator(64, image_size=64)
+    discriminator = Discriminator(64)
 
     # print(genertor, discriminator)
 
-    input = torch.randn(64, 100)
-    x, att1, att2 = genertor(input)
+    image = torch.randn(64, 1, 64, 64)
+    image = image.cuda()
+
+    z = torch.randn(64, 128)
+    z = z.cuda()
+
+    label = torch.randn(64)
+    label = label.type(torch.cuda.LongTensor)
+
+    # y, p1, p2 = discriminator(image, label)
+
+    x, att1, att2 = genertor(z, label)
     print(x.shape, att1.shape, att2.shape)
 
 # %%

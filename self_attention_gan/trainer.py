@@ -85,24 +85,26 @@ class Trainer(object):
             self.G.train()
 
             try:
-                real_images, _ = next(data_iter)
+                real_images, labels = next(data_iter)
             except:
                 data_iter = iter(self.data_loader)
-                real_images, _ = next(data_iter)
+                real_images, labels = next(data_iter)
 
             # compute loss with real images 
             # dr1, dr2, df1, df2, gf1, gf2 are attention scores 
             real_images = tensor2var(real_images)
-            d_out_real, dr1, dr2 = self.D(real_images)
+            labels = tensor2var(labels)
+
+            d_out_real, dr1, dr2 = self.D(real_images, labels)
             if self.adv_loss == 'wgan-gp':
                 d_loss_real = -torch.mean(d_out_real)
             elif self.adv_loss == 'hinge':
                 d_loss_real = torch.nn.ReLU()(1.0 - d_out_real).mean()
 
             # apply Gumbel Softmax
-            z = tensor2var(torch.randn(real_images.size(0), self.z_dim))
-            fake_images, gf1, gf2 = self.G(z)
-            d_out_fake, df1, df2 = self.D(fake_images)
+            z = tensor2var(torch.randn(real_images.size(0), self.z_dim)) # 64, 100
+            fake_images, gf1, gf2 = self.G(z, labels)
+            d_out_fake, df1, df2 = self.D(fake_images, labels)
 
             if self.adv_loss == 'wgan-gp':
                 d_loss_fake = d_out_fake.mean()
@@ -122,7 +124,7 @@ class Trainer(object):
                 # compute gradient penalty
                 alpha = torch.rand(real_images.size(0), 1, 1, 1).cuda().expand_as(real_images)
                 interpolated = Variable(alpha * real_images.data + (1 - alpha) * fake_images.data, requires_grad = True)
-                out, _, _ = self.D(interpolated)
+                out, _, _ = self.D(interpolated, labels)
 
                 grad = torch.autograd.grad(
                     outputs=out,
@@ -149,10 +151,10 @@ class Trainer(object):
             # =================== Train G and gumbel =====================
             # create random noise 
             z = tensor2var(torch.randn(real_images.size(0), self.z_dim))
-            fake_images, _, _ = self.G(z)
+            fake_images, _, _ = self.G(z, labels)
 
             # compute loss with fake images 
-            g_out_fake, _, _ = self.D(fake_images) # batch x n
+            g_out_fake, _, _ = self.D(fake_images, labels) # batch x n
             if self.adv_loss == 'wgan-gp':
                 g_loss_fake = - g_out_fake.mean()
 
@@ -175,7 +177,7 @@ class Trainer(object):
             # sample images 
             if (step + 1) % self.sample_step == 0:
                 self.save_sample(real_images, step)
-                fake_images, _, _ = self.G(fixed_z)
+                fake_images, _, _ = self.G(fixed_z, labels)
                 save_image(denorm(fake_images.data),
                             os.path.join(self.sample_path, '{}_fake.png'.format(step + 1)))
 
@@ -183,8 +185,8 @@ class Trainer(object):
 
     def build_model(self):
 
-        self.G = Generator(self.batch_size, self.imsize, self.z_dim, self.g_conv_dim, self.channels).cuda()
-        self.D = Discriminator(self.batch_size, self.imsize, self.d_conv_dim, self.channels).cuda()
+        self.G = Generator(batch_size = self.batch_size, image_size = self.imsize, z_dim = self.z_dim, conv_dim = self.g_conv_dim, channels = self.channels).cuda()
+        self.D = Discriminator(batch_size = self.batch_size, image_size = self.imsize, conv_dim = self.d_conv_dim, channels = self.channels).cuda()
         
         # loss and optimizer 
         self.g_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.G.parameters()), self.g_lr, [self.beta1, self.beta2])
