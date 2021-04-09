@@ -29,7 +29,7 @@ def get_parameters():
     parser.add_argument('--version', type=str, default='sagan_1')
 
     # Training setting
-    parser.add_argument('--total_step', type=int, default=1000, help='how many times to update the generator')
+    parser.add_argument('--total_step', type=int, default=100000, help='how many times to update the generator')
     parser.add_argument('--d_iters', type=float, default=5)
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--num_workers', type=int, default=2)

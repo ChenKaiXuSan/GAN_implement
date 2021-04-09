@@ -32,7 +32,7 @@ os.makedirs('images/c_wgan/real_image/', exist_ok=True)
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import shutil
-shutil.rmtree('runs/')
+# shutil.rmtree('runs/')
 writer = SummaryWriter('runs/c_wgan')
 # %%
 parser = argparse.ArgumentParser()
