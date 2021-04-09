@@ -365,3 +365,5 @@ conditional_wgan/paper/
 self_attention_gan/logs
 self_attention_gan/samples 
 .vscode/settings.json
+
+self_attention_gan/paper

@@ -9,7 +9,6 @@ from self_attention_gan.dataset.dataset import getdDataset
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-
 import argparse
 # %%
 def get_parameters():
@@ -67,6 +66,11 @@ def get_parameters():
 def main(config):
     # data loader 
     data_loader = getdDataset(config)
+
+    # delete the exists path
+    del_folder(config.sample_path, config.version)
+    del_folder(config.log_path, config.version)
+    del_folder(config.sample_path, config.version + '/real_images')
 
     # create directories if not exist
     make_folder(config.sample_path, config.version)

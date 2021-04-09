@@ -10,6 +10,8 @@ from torch.autograd import Variable
 from torch.utils.data import dataloader
 from torchvision.utils import save_image
 
+import numpy as np
+
 import sys 
 sys.path.append('.')
 sys.path.append('..')
@@ -177,7 +179,11 @@ class Trainer(object):
             # sample images 
             if (step + 1) % self.sample_step == 0:
                 self.save_sample(real_images, step)
-                fake_images, _, _ = self.G(fixed_z, labels)
+                labels = np.array([num for _ in range(8) for num in range(8)])
+
+                with torch.no_grad():
+                    labels = to_LongTensor(labels)
+                    fake_images, _, _ = self.G(fixed_z, labels)
                 save_image(denorm(fake_images.data),
                             os.path.join(self.sample_path, '{}_fake.png'.format(step + 1)))
 
