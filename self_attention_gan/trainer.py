@@ -130,7 +130,9 @@ class Trainer(object):
             if self.adv_loss == 'wgan-gp':
                 # compute gradient penalty
                 alpha = torch.rand(real_images.size(0), 1, 1, 1).cuda().expand_as(real_images)
+                # 64, 1, 64, 64
                 interpolated = Variable(alpha * real_images.data + (1 - alpha) * fake_images.data, requires_grad = True)
+                # 64
                 out, _, _ = self.D(interpolated, labels)
 
                 grad = autograd.grad(
@@ -162,7 +164,7 @@ class Trainer(object):
 
                 # compute w-div gradient penalty
 
-                real_grad_out = to_Tensor(real_images.size(0), 1).fill_(1.0)
+                real_grad_out = to_Tensor(real_images.size(0)).fill_(1.0)
 
                 real_grad = autograd.grad(
                     outputs = d_out_real,
@@ -174,7 +176,7 @@ class Trainer(object):
                 )[0]
                 real_grad_norm = real_grad.view(real_grad.size(0), -1).pow(2).sum(1) ** (p / 2)
 
-                fake_grad_out = to_Tensor(fake_images.size(0), 1).fill_(1.0)
+                fake_grad_out = to_Tensor(fake_images.size(0)).fill_(1.0)
 
                 fake_grad = autograd.grad(
                     outputs = d_out_fake,

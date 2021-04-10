@@ -222,9 +222,9 @@ if __name__ == '__main__':
     z = z.cuda()
 
     label = torch.randn(64)
-    label = label.type(torch.cuda.LongTensor)
+    label = label.type(torch.LongTensor)
 
-    # y, p1, p2 = discriminator(image, label)
+    y, p1, p2 = discriminator(image, label)
 
     x, att1, att2 = genertor(z, label)
     print(x.shape, att1.shape, att2.shape)

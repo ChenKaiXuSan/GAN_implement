@@ -17,7 +17,7 @@ def get_parameters():
 
     # Model hyper-parameters
     parser.add_argument('--model', type=str, default='sagan', choices=['sagan', 'qgan'])
-    parser.add_argument('--adv_loss', type=str, default='wgan-div', choices=['wgan-gp', 'hinge', 'wgan-div'])
+    parser.add_argument('--adv_loss', type=str, default='wgan-gp', choices=['wgan-gp', 'hinge', 'wgan-div'])
     parser.add_argument('--img_size', type=int, default=64)
     parser.add_argument('--channels', type=int, default=1, help='number of image channels')
     parser.add_argument('--g_num', type=int, default=5)
@@ -60,7 +60,7 @@ def get_parameters():
     parser.add_argument('--model_save_step', type=float, default=1.0)
 
 
-    return parser.parse_args()
+    return parser.parse_args([])
 
 # %%
 def main(config):
