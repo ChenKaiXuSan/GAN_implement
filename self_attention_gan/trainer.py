@@ -164,11 +164,15 @@ class Trainer(object):
 
                 # compute w-div gradient penalty
 
-                real_grad_out = to_Tensor(real_images.size(0)).fill_(1.0)
+                # real grad
+                interpolated = Variable(real_images, requires_grad = True)
+                out, _, _ = self.D(interpolated, labels)
+
+                real_grad_out = torch.ones(real_images.size(0)).cuda()
 
                 real_grad = autograd.grad(
-                    outputs = d_out_real,
-                    inputs = real_images,
+                    outputs = out,
+                    inputs = interpolated,
                     grad_outputs = real_grad_out,
                     retain_graph = True,
                     create_graph = True,
@@ -176,11 +180,15 @@ class Trainer(object):
                 )[0]
                 real_grad_norm = real_grad.view(real_grad.size(0), -1).pow(2).sum(1) ** (p / 2)
 
-                fake_grad_out = to_Tensor(fake_images.size(0)).fill_(1.0)
+                # fake grad
+                interpolated = Variable(fake_images, requires_grad = True)
+                out, _, _ = self.D(interpolated, labels)
+
+                fake_grad_out = torch.ones(fake_images.size(0)).cuda()
 
                 fake_grad = autograd.grad(
-                    outputs = d_out_fake,
-                    inputs = fake_images,
+                    outputs = out,
+                    inputs = interpolated,
                     grad_outputs = fake_grad_out,
                     retain_graph = True,
                     create_graph = True,
@@ -188,6 +196,7 @@ class Trainer(object):
                 )[0]
                 fake_grad_norm = fake_grad.view(fake_grad.size(0), -1).pow(2).sum(1) ** (p / 2)
 
+                # compute div_gp loss 
                 div_gp = torch.mean(real_grad_norm + fake_grad_norm) * k / 2
 
                 d_loss = div_gp

@@ -30,14 +30,14 @@ def make_folder(path, version):
 
 def tensor2var(x, grad=False):
     '''
-    put tensor to gpu, and compute grad
+    put tensor to gpu, and set grad to false
 
     Args:
         x (tensor): input tensor
-        grad (bool, optional): if need grad. Defaults to False.
+        grad (bool, optional):  Defaults to False.
 
     Returns:
-        tensor: tensor in gpu and need grad
+        tensor: tensor in gpu and set grad to false 
     '''    
     if torch.cuda.is_available():
         x = x.cuda()
