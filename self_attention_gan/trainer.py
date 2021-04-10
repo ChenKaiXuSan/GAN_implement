@@ -9,6 +9,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 from torch.utils.data import dataloader
 from torchvision.utils import save_image
+import torch.autograd as autograd
 
 import numpy as np
 
@@ -102,6 +103,8 @@ class Trainer(object):
                 d_loss_real = -torch.mean(d_out_real)
             elif self.adv_loss == 'hinge':
                 d_loss_real = torch.nn.ReLU()(1.0 - d_out_real).mean()
+            elif self.adv_loss == 'wgan-div':
+                d_loss_real = -torch.mean(d_out_real)
 
             # apply Gumbel Softmax
             z = tensor2var(torch.randn(real_images.size(0), self.z_dim)) # 64, 100
@@ -112,6 +115,8 @@ class Trainer(object):
                 d_loss_fake = d_out_fake.mean()
             elif self.adv_loss == 'hinge':
                 d_loss_fake = torch.nn.ReLU()(1.0 + d_out_fake).mean()
+            elif self.adv_loss == 'wgan-div':
+                d_loss_fake = d_out_fake.mean()
 
             
             # backward + optimize 
@@ -120,7 +125,7 @@ class Trainer(object):
             d_loss.backward()
             self.d_optimizer.step()
 
-            self.logger.add_scalar('d_loss_real', d_loss, step)
+            self.logger.add_scalar('d_loss_real + d_loss_fake', d_loss, step)
 
             if self.adv_loss == 'wgan-gp':
                 # compute gradient penalty
@@ -128,7 +133,7 @@ class Trainer(object):
                 interpolated = Variable(alpha * real_images.data + (1 - alpha) * fake_images.data, requires_grad = True)
                 out, _, _ = self.D(interpolated, labels)
 
-                grad = torch.autograd.grad(
+                grad = autograd.grad(
                     outputs=out,
                     inputs = interpolated,
                     grad_outputs = torch.ones(out.size()).cuda(),
@@ -148,23 +153,69 @@ class Trainer(object):
                 d_loss.backward()
                 self.d_optimizer.step()
 
-                self.logger.add_scalar('d_loss', d_loss, step)
+                self.logger.add_scalar('d_loss_gp', d_loss, step)
+            
+            # todo
+            elif self.adv_loss == 'wgan-div':
+                p = 6
+                k = 2
 
-            # =================== Train G and gumbel =====================
-            # create random noise 
-            z = tensor2var(torch.randn(real_images.size(0), self.z_dim))
-            fake_images, _, _ = self.G(z, labels)
+                # compute w-div gradient penalty
 
-            # compute loss with fake images 
-            g_out_fake, _, _ = self.D(fake_images, labels) # batch x n
-            if self.adv_loss == 'wgan-gp':
-                g_loss_fake = - g_out_fake.mean()
+                real_grad_out = to_Tensor(real_images.size(0), 1).fill_(1.0)
 
-            self.reset_grad()
-            g_loss_fake.backward()
-            self.g_optimizer.step()
+                real_grad = autograd.grad(
+                    outputs = d_out_real,
+                    inputs = real_images,
+                    grad_outputs = real_grad_out,
+                    retain_graph = True,
+                    create_graph = True,
+                    only_inputs = True,
+                )[0]
+                real_grad_norm = real_grad.view(real_grad.size(0), -1).pow(2).sum(1) ** (p / 2)
 
-            self.logger.add_scalar('g_loss_fake', g_loss_fake, step)
+                fake_grad_out = to_Tensor(fake_images.size(0), 1).fill_(1.0)
+
+                fake_grad = autograd.grad(
+                    outputs = d_out_fake,
+                    inputs = fake_images,
+                    grad_outputs = fake_grad_out,
+                    retain_graph = True,
+                    create_graph = True,
+                    only_inputs = True,
+                )[0]
+                fake_grad_norm = fake_grad.view(fake_grad.size(0), -1).pow(2).sum(1) ** (p / 2)
+
+                div_gp = torch.mean(real_grad_norm + fake_grad_norm) * k / 2
+
+                d_loss = div_gp
+
+                self.reset_grad()
+                d_loss.backward()
+                self.d_optimizer.step()
+
+                self.logger.add_scalar('d_loss_div', d_loss, step)
+
+            # train the generator every 5 steps
+            if step % 5 == 0:
+
+                # =================== Train G and gumbel =====================
+                # create random noise 
+                z = tensor2var(torch.randn(real_images.size(0), self.z_dim))
+                fake_images, _, _ = self.G(z, labels)
+
+                # compute loss with fake images 
+                g_out_fake, _, _ = self.D(fake_images, labels) # batch x n
+                if self.adv_loss == 'wgan-gp':
+                    g_loss_fake = -g_out_fake.mean()
+                if self.adv_loss == 'wgan-div':
+                    g_loss_fake = -g_out_fake.mean()
+
+                self.reset_grad()
+                g_loss_fake.backward()
+                self.g_optimizer.step()
+
+                self.logger.add_scalar('g_loss_fake', g_loss_fake, step)
 
             # print out log info
             if (step + 1) % self.log_step == 0:
@@ -186,7 +237,6 @@ class Trainer(object):
                     fake_images, _, _ = self.G(fixed_z, labels)
                 save_image(denorm(fake_images.data),
                             os.path.join(self.sample_path, '{}_fake.png'.format(step + 1)))
-
 
 
     def build_model(self):
