@@ -79,6 +79,6 @@ def to_LongTensor(labels):
     LongTensor = torch.cuda.LongTensor if torch.cuda.is_available() else torch.LongTensor
     return LongTensor(labels)
 
-def to_Tensor(x):
+def to_Tensor(x, *arg):
     Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.LongTensor
-    return Tensor(x)
+    return Tensor(x, *arg)
