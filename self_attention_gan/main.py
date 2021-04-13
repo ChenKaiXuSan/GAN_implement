@@ -37,6 +37,7 @@ def get_parameters():
     parser.add_argument('--lr_decay', type=float, default=0.95)
     parser.add_argument('--beta1', type=float, default=0.0)
     parser.add_argument('--beta2', type=float, default=0.9)
+    parser.add_argument('--n_classes', type=int, default=10, help='how many labels in dataset')
 
     # using pretrained
     parser.add_argument('--pretrained_model', type=int, default=None)

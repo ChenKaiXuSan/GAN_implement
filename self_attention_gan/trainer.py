@@ -51,6 +51,7 @@ class Trainer(object):
         self.beta1 = config.beta1
         self.beta2 = config.beta2
         self.pretrained_model = config.pretrained_model
+        self.n_classes = config.n_classes
 
         self.dataset = config.dataset 
         self.use_tensorboard = config.use_tensorboard
@@ -241,7 +242,8 @@ class Trainer(object):
             # sample images 
             if (step + 1) % self.sample_step == 0:
                 self.save_sample(real_images, step)
-                labels = np.array([num for _ in range(8) for num in range(8)])
+                # make the fake labels by classes 
+                labels = np.array([num for _ in range(self.n_classes) for num in range(self.n_classes)])
 
                 with torch.no_grad():
                     labels = to_LongTensor(labels)
@@ -252,8 +254,8 @@ class Trainer(object):
 
     def build_model(self):
 
-        self.G = Generator(batch_size = self.batch_size, image_size = self.imsize, z_dim = self.z_dim, conv_dim = self.g_conv_dim, channels = self.channels).cuda()
-        self.D = Discriminator(batch_size = self.batch_size, image_size = self.imsize, conv_dim = self.d_conv_dim, channels = self.channels).cuda()
+        self.G = Generator(batch_size = self.batch_size, image_size = self.imsize, z_dim = self.z_dim, conv_dim = self.g_conv_dim, channels = self.channels, n_classes=self.n_classes).cuda()
+        self.D = Discriminator(batch_size = self.batch_size, image_size = self.imsize, conv_dim = self.d_conv_dim, channels = self.channels, n_classes=self.n_classes).cuda()
         
         # loss and optimizer 
         self.g_optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.G.parameters()), self.g_lr, [self.beta1, self.beta2])
