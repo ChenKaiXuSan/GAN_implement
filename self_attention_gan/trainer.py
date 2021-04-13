@@ -77,9 +77,6 @@ class Trainer(object):
         data_iter = iter(self.data_loader)
         step_per_epoch = len(self.data_loader)
 
-        # fixed input for debugging
-        fixed_z = tensor2var(torch.randn(self.batch_size, self.z_dim))
-
         # start time
         start_time = time.time()
         for step in range(self.total_step):
@@ -244,12 +241,15 @@ class Trainer(object):
                 self.save_sample(real_images, step)
                 # make the fake labels by classes 
                 labels = np.array([num for _ in range(self.n_classes) for num in range(self.n_classes)])
+                
+                # fixed input for debugging
+                fixed_z = tensor2var(torch.randn(self.n_classes ** 2, self.z_dim))
 
                 with torch.no_grad():
                     labels = to_LongTensor(labels)
                     fake_images, _, _ = self.G(fixed_z, labels)
                 save_image(denorm(fake_images.data),
-                            os.path.join(self.sample_path, '{}_fake.png'.format(step + 1)))
+                            os.path.join(self.sample_path, '{}_fake.png'.format(step + 1)), nrow=self.n_classes, normalize=True)
 
 
     def build_model(self):
@@ -279,3 +279,18 @@ class Trainer(object):
         # real_images, _ = next(data_iter)
         path = self.sample_path + '/real_images'
         save_image(denorm(real_images.data), os.path.join(path, '{}_real.png'.format(step + 1)))
+
+# %%
+import self_attention_gan.main  as main
+from self_attention_gan.dataset.dataset import getdDataset
+
+if __name__ == '__main__':
+    config = main.get_parameters()
+    config.total_step = 10
+    print(config)
+    # main(config)
+    data_loader = getdDataset(config)
+
+    trainer = Trainer(data_loader, config)
+    trainer.train()
+# %%
