@@ -209,7 +209,7 @@ class Trainer(object):
                 self.logger.add_scalar('d_loss_div', d_loss, step)
 
             # train the generator every 5 steps
-            if step % 5 == 0:
+            if step % self.g_num == 0:
 
                 # =================== Train G and gumbel =====================
                 # create random noise 
