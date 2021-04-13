@@ -35,8 +35,8 @@ def get_parameters():
     parser.add_argument('--g_lr', type=float, default=0.0001)
     parser.add_argument('--d_lr', type=float, default=0.0004)
     parser.add_argument('--lr_decay', type=float, default=0.95)
-    parser.add_argument('--beta1', type=float, default=0.0)
-    parser.add_argument('--beta2', type=float, default=0.9)
+    parser.add_argument('--beta1', type=float, default=0.5)
+    parser.add_argument('--beta2', type=float, default=0.999)
 
     # using pretrained
     parser.add_argument('--pretrained_model', type=int, default=None)
