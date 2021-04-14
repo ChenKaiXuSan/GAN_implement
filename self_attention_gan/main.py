@@ -61,7 +61,7 @@ def get_parameters():
     parser.add_argument('--model_save_step', type=float, default=1.0)
 
 
-    return parser.parse_args()
+    return parser.parse_args([])
 
 # %%
 def main(config):

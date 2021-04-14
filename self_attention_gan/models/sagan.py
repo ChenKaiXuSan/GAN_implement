@@ -124,7 +124,7 @@ class Generator(nn.Module):
             layer4.append(nn.BatchNorm2d(int(curr_dim / 2)))
             layer4.append(nn.ReLU())
             self.l4 = nn.Sequential(*layer4)
-            curr_dim = int(curr_dim / 2)
+        curr_dim = int(curr_dim / 2)
 
         self.l1 = nn.Sequential(*layer1)
         self.l2 = nn.Sequential(*layer2)
@@ -148,11 +148,13 @@ class Generator(nn.Module):
         out = self.l1(input)
         out = self.l2(out)
         out = self.l3(out)
+
         if self.imsize == 64:
+            out, p = self.attn1(out)
             out = self.l4(out)
             out, p = self.attn2(out)
         else:
-            out, p = self.attn1(out)
+            out, p = self.attn2(out)
 
         out = self.last(out)
 
@@ -213,11 +215,11 @@ class Discriminator(nn.Module):
         out = self.l1(input)
         out = self.l2(out)
         out = self.l3(out)
+        out, p = self.attn1(out)
+
         if self.imsize == 64:
             out = self.l4(out)
             out, p = self.attn2(out)
-        else:
-            out, p = self.attn1(out)
 
         out = self.last(out)
 

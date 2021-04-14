@@ -286,8 +286,8 @@ from self_attention_gan.dataset.dataset import getdDataset
 
 if __name__ == '__main__':
     config = main.get_parameters()
-    config.total_step = 10
-    config.img_size = 64
+    config.total_step = 1000
+    config.img_size = 32
     print(config)
     # main(config)
     data_loader = getdDataset(config)
