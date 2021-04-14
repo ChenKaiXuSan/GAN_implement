@@ -96,7 +96,7 @@ class Trainer(object):
             real_images = tensor2var(real_images)
             labels = tensor2var(labels)
 
-            d_out_real, dr1, dr2 = self.D(real_images, labels)
+            d_out_real, dr = self.D(real_images, labels)
             if self.adv_loss == 'wgan-gp':
                 d_loss_real = -torch.mean(d_out_real)
             elif self.adv_loss == 'hinge':
@@ -106,8 +106,8 @@ class Trainer(object):
 
             # apply Gumbel Softmax
             z = tensor2var(torch.randn(real_images.size(0), self.z_dim)) # 64, 100
-            fake_images, gf1, gf2 = self.G(z, labels)
-            d_out_fake, df1, df2 = self.D(fake_images, labels)
+            fake_images, gf = self.G(z, labels)
+            d_out_fake, df = self.D(fake_images, labels)
 
             if self.adv_loss == 'wgan-gp':
                 d_loss_fake = d_out_fake.mean()
@@ -131,7 +131,7 @@ class Trainer(object):
                 # 64, 1, 64, 64
                 interpolated = Variable(alpha * real_images.data + (1 - alpha) * fake_images.data, requires_grad = True)
                 # 64
-                out, _, _ = self.D(interpolated, labels)
+                out, _ = self.D(interpolated, labels)
 
                 grad = autograd.grad(
                     outputs=out,
@@ -164,7 +164,7 @@ class Trainer(object):
 
                 # real grad
                 interpolated = Variable(real_images, requires_grad = True)
-                out, _, _ = self.D(interpolated, labels)
+                out, _ = self.D(interpolated, labels)
 
                 real_grad_out = torch.ones(real_images.size(0)).cuda()
 
@@ -180,7 +180,7 @@ class Trainer(object):
 
                 # fake grad
                 interpolated = Variable(fake_images, requires_grad = True)
-                out, _, _ = self.D(interpolated, labels)
+                out, _ = self.D(interpolated, labels)
 
                 fake_grad_out = torch.ones(fake_images.size(0)).cuda()
 
@@ -211,10 +211,10 @@ class Trainer(object):
                 # =================== Train G and gumbel =====================
                 # create random noise 
                 z = tensor2var(torch.randn(real_images.size(0), self.z_dim))
-                fake_images, _, _ = self.G(z, labels)
+                fake_images, _ = self.G(z, labels)
 
                 # compute loss with fake images 
-                g_out_fake, _, _ = self.D(fake_images, labels) # batch x n
+                g_out_fake, _ = self.D(fake_images, labels) # batch x n
                 if self.adv_loss == 'wgan-gp':
                     g_loss_fake = -g_out_fake.mean()
                 if self.adv_loss == 'wgan-div':
@@ -287,6 +287,7 @@ from self_attention_gan.dataset.dataset import getdDataset
 if __name__ == '__main__':
     config = main.get_parameters()
     config.total_step = 10
+    config.img_size = 64
     print(config)
     # main(config)
     data_loader = getdDataset(config)

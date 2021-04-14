@@ -21,7 +21,7 @@ def get_parameters():
     parser.add_argument('--img_size', type=int, default=64)
     parser.add_argument('--channels', type=int, default=1, help='number of image channels')
     parser.add_argument('--g_num', type=int, default=5)
-    parser.add_argument('--z_dim', type=int, default=128)
+    parser.add_argument('--z_dim', type=int, default=100)
     parser.add_argument('--g_conv_dim', type=int, default=64)
     parser.add_argument('--d_conv_dim', type=int, default=64)
     parser.add_argument('--lambda_gp', type=float, default=10)
@@ -87,6 +87,8 @@ def main(config):
 # %% 
 if __name__ == '__main__':
     config = get_parameters()
+    config.total_step = 5000
+    config.dataset = 'mnist'
     print(config)
     main(config)
 # %%
