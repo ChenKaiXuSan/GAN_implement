@@ -247,7 +247,7 @@ class Trainer(object):
 
                 with torch.no_grad():
                     labels = to_LongTensor(labels)
-                    fake_images, _, _ = self.G(fixed_z, labels)
+                    fake_images, _= self.G(fixed_z, labels)
                 save_image(denorm(fake_images.data),
                             os.path.join(self.sample_path, '{}_fake.png'.format(step + 1)), nrow=self.n_classes, normalize=True)
 

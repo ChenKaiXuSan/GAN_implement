@@ -61,7 +61,7 @@ def get_parameters():
     parser.add_argument('--model_save_step', type=float, default=1.0)
 
 
-    return parser.parse_args([])
+    return parser.parse_args()
 
 # %%
 def main(config):
@@ -87,8 +87,6 @@ def main(config):
 # %% 
 if __name__ == '__main__':
     config = get_parameters()
-    config.total_step = 5000
-    config.dataset = 'mnist'
     print(config)
     main(config)
 # %%
