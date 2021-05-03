@@ -1,140 +1,201 @@
 # %% 
 import os
+
+from torch._C import wait
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
+import sys
+sys.path.append('..')
+sys.path.append('.')
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 import random
 import torchvision.utils as utils
+from torch.autograd import Variable
 
-from models.vae_gan import Discriminator, Encoder, Generator
-from dataset.dataset import get_Dataset
-from utils.utils import get_cuda, weights_init, generate_samples
+np.random.seed(8)
+torch.manual_seed(8)
+torch.cuda.manual_seed(8)
+
+from vae_gan.models.vae_gan import Discriminator, Encoder, VaeGan
+from vae_gan.dataset.dataset import get_Dataset
+from vae_gan.utils.utils import get_cuda, weights_init, generate_samples
+
+from torch.optim.lr_scheduler import ExponentialLR, MultiStepLR
+from torch.optim import RMSprop, Adam, SGD
+from torchvision.utils import make_grid
+import torchvision.utils as vutils
+from torchvision.utils import save_image
+
+from vae_gan.options import args
 
 import argparse
 # %%
-os.makedirs("images/", exist_ok=True)
+# set random seed for reproducibility
+manualSeed = 999
+print("Random Seed: ", manualSeed)
+random.seed(manualSeed)
+torch.manual_seed(manualSeed)
 
 # %%
-parser = argparse.ArgumentParser()
-parser.add_argument("--n_epochs", type=int, default=150, help="number of epochs of training")
-parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
-parser.add_argument("--lr", type=float, default=0.00005, help="adam: learning rate")
-parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
-parser.add_argument("--latent_dim", type=int, default=100, help="dimensionality of the latent space")
-parser.add_argument("--img_size", type=int, default=128, help="size of each image dimension")
-parser.add_argument("--channels", type=int, default=3, help="number of image channels")
-parser.add_argument("--n_critic", type=int, default=5, help="number of training steps for discriminator per iter")
-parser.add_argument("--clip_value", type=float, default=0.01, help="lower and upper clip value for disc. weights")
-parser.add_argument("--sample_interval", type=int, default=400, help="interval betwen image samples")
-parser.add_argument("--dcgan", action='store_false', help='use MLP')
-parser.add_argument("--dataset", type=str, choices=['mnist', 'fashion', 'cifar10'],
-                    default='cifar10', help="dataset to use")
-parser.add_argument("--dataroot", type=str, default='../data/', help='path to dataset')
-parser.add_argument('--w_kld', type=float, default=1)
-parser.add_argument('--w_loss_g', type=float, default=0.01)
-parser.add_argument('--w_loss_gd', type=float, default=1)
+if not os.path.exists('./images'):
+    os.makedirs("./images", exist_ok=True)
 
-opt = parser.parse_args([])
-print(opt)
-# %%
-manual_seed = random.randint(1, 10000)
-random.seed(manual_seed)
-torch.manual_seed(manual_seed)
-if torch.cuda.is_available():
-    torch.cuda.manual_seed_all(manual_seed)
-
-train_loader = get_Dataset(opt)
-# %%
-encoder = get_cuda(Encoder(opt))
-generator = get_cuda(Generator(opt)).apply(weights_init)
-discriminator = get_cuda(Discriminator(opt)).apply(weights_init)
-
-print(encoder)
-print(generator)
-print(discriminator)
-# %%
-optimizer_E = torch.optim.Adam(encoder.parameters(), lr=opt.lr)
-optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.lr, betas=(0.5, 0.999))
-optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.lr, betas=(0.5, 0.999))
+directory = './result'
+if not os.path.exists(directory):
+    os.makedirs(directory)
 
 # %%
-def train_batch(x_r):
-    batch_size = x_r.size(0)
-    y_real = get_cuda(torch.ones(batch_size))
-    y_fake = get_cuda(torch.zeros(batch_size))
+# manual_seed = random.randint(1, 10000)
+# random.seed(manual_seed)
+# torch.manual_seed(manual_seed)
+# if torch.cuda.is_available():
+#     torch.cuda.manual_seed_all(manual_seed)
 
-    z, kld = encoder(x_r)
-    kld = kld.mean()
+# ------------ dataloader ------------
 
-    x_f = generator(z)
-
-    z_p = torch.randn(batch_size, opt.latent_dim)
-    z_p = get_cuda(z_p)
-
-    x_p = generator(z_p)
-
-    # compute d(x) for real and fake images along with their features
-    ld_r, fd_r = discriminator(x_r)
-    ld_f, fd_f = discriminator(x_f)
-    ld_p, fd_p = discriminator(x_p)
-
-    # ---------------------
-    #  Train Discriminator
-    # ---------------------
-    loss_D = F.binary_cross_entropy(ld_r, y_real) + 0.5 * (F.binary_cross_entropy(ld_f, y_fake) + F.binary_cross_entropy(ld_p, y_fake))
-    optimizer_D.zero_grad()
-    loss_D.backward(retain_graph=True)
-    optimizer_D.step()
-
-    # ---------------------
-    #  Train G and E
-    # ---------------------
-    with torch.autograd.set_detect_anomaly(True):
-        # loss to -log(D(G(z_p)))
-        y_real.requires_grad_(True)
-        loss_GD = F.binary_cross_entropy(ld_p, y_real)
-        # pixel wise matching loss and discriminator's feature matching loss
-        loss_G = 0.5 * (0.01 * (x_f - x_r).pow(2).sum() + (fd_f - fd_r.detach()).pow(2).sum()) / batch_size
-        loss_G.requires_grad_(True)
-        loss_G.backward()
-
-    optimizer_E.zero_grad()
-    optimizer_G.zero_grad()
-
-    loss = opt.w_kld * kld + opt.w_loss_g * loss_G + opt.w_loss_gd * loss_GD
-    loss.requires_grad_(True)
-    loss.backward()
-    optimizer_E.step()
-    optimizer_G.step()
-
-    return loss_D.item(), loss_G.item(), loss_GD.item(), kld.item()
+train_loader = get_Dataset(args, train=True)
+test_loader = get_Dataset(args, train=False)
+print(len(train_loader))
 
 # %%
-def training():
-    print("start training!")
-    start_epoch = 0
-    
-    for epoch in range(opt.n_epochs):
-        encoder.train()
-        generator.train()
-        discriminator.train()
+net = VaeGan(z_size=args.z_size, recon_level=args.recon_level).cuda()
 
-        for imgs, _ in train_loader:
-            imgs = get_cuda(imgs)
-            loss_D, loss_G, loss_GD, loss_kld = train_batch(imgs) #64, 3, 128, 128
-
-        print("epoch:", epoch, "loss_D:", "%.4f"% loss_D, "loss_G:", "%.4f"%loss_G, "loss_GD:", "%.4f"%loss_GD, "loss_kld:", "%.4f"%loss_kld)
-
-        generate_samples("images/%d.png" % epoch, opt, encoder, discriminator, generator)
+print(net)
 
 # %%
+# ------------ margin and equilibirum ------------
+margin = 0.35
+equilibrium = 0.68
+# %%
+# --------------------- optimizers --------------------
+# an optimizer for each of the sub-networks, so we can selectively backprop
+
+optimizer_encoder = RMSprop(params=net.encoder.parameters(), lr=args.lr, alpha=0.9, eps=1e-8, weight_decay=0, momentum=0, centered=False)
+lr_encoder = ExponentialLR(optimizer=optimizer_encoder, gamma=args.decay_lr)
+
+optimizer_decoder = RMSprop(params=net.decoder.parameters(), lr=args.lr, alpha=0.9, eps=1e-8, weight_decay=0, momentum=0, centered=False)
+lr_decoder = ExponentialLR(optimizer=optimizer_decoder, gamma=args.decay_lr)
+
+optimizer_discriminator = RMSprop(params=net.discriminator.parameters(), lr=args.lr, alpha=0.9, eps=1e-8, weight_decay=0, momentum=0, centered=False)
+lr_discriminator = ExponentialLR(optimizer=optimizer_discriminator, gamma=args.decay_lr)
+
+# %%
+# ------------ training loop ------------
+
 if __name__ == "__main__":
-    # training()
-    for img, _ in train_loader:
-        img = get_cuda(img)
-        loss_D, loss_G, loss_GD, loss_kld = train_batch(img)
-# %%
+    
+    z_size = args.z_size
+    recon_level = args.recon_level
+    decay_mse = args.decay_mse
+    decay_margin = args.decay_margin
+    n_epochs = args.n_epochs
+    lambda_mse = args.lambda_mse
+    lr = args.lr
+    decay_lr = args.decay_lr
+    decay_equilibrium = args.decay_equilibrium
+
+    for i in range(n_epochs + 1):
+        print('Epoch: %s' % (i))
+        for j, (x, label) in enumerate (train_loader):
+            net.train()
+            batch_size = len(x)
+
+            x = Variable(x, requires_grad=False).float().cuda()
+
+            x_tilde, disc_class, disc_layer, mus, log_variances = net(x)
+        
+            # split so we can get the different parts
+            disc_layer_original = disc_layer[:batch_size]
+            disc_layer_predicted = disc_layer[batch_size:-batch_size]
+            disc_layer_sampled = disc_layer[-batch_size]
+
+            disc_class_original = disc_class[:batch_size]
+            disc_class_predicted = disc_class[batch_size:-batch_size]
+            disc_class_sampled = disc_class[-batch_size]
+
+            nle, kl, mse, bce_dis_original, bce_dis_predicted, bce_dis_sampled = VaeGan.loss(
+                x, x_tilde=x_tilde, disc_layer_original=disc_layer_original, \
+                disc_layer_predicted=disc_layer_predicted, disc_layer_sampled=disc_layer_sampled, \
+                disc_class_original=disc_class_original, disc_class_predicted=disc_class_predicted, \
+                disc_class_sampled=disc_class_sampled, mus=mus, variances=log_variances                        
+            )
+
+            
+            # this is the most important part of the code 
+            loss_encoder = torch.sum(kl)+torch.sum(mse)
+            loss_discriminator = torch.sum(bce_dis_original) + torch.sum(bce_dis_predicted) + torch.sum(bce_dis_sampled)
+            loss_decoder = torch.sum(lambda_mse * mse) - (1.0 - lambda_mse) * loss_discriminator
+
+            # selectively disable the decoder of the discriminator if they are unbalanced
+            train_dis = True
+            train_dec = True
+
+            if torch.mean(bce_dis_original).item() < equilibrium-margin or torch.mean(bce_dis_predicted).item() < equilibrium-margin:
+                train_dis = False
+            if torch.mean(bce_dis_original).item() > equilibrium+margin or torch.mean(bce_dis_predicted).item() > equilibrium+margin:
+                train_dec = False
+            if train_dec is False and train_dis is False:
+                train_dis = True
+                train_dec = True
+
+            net.zero_grad()
+
+            # encoder 
+            loss_encoder.backward(retain_graph=True)
+            net.zero_grad() # cleanothers, so they are not afflicted by encoder loss 
+
+            # decoder 
+            if train_dec:
+                loss_decoder.backward(retain_graph=True)
+                net.discriminator.zero_grad() # clean the discriminator
+
+            # discriminator 
+            if train_dis:
+                loss_discriminator.backward()
+            
+            # 这个地方存在问题，有可能
+            optimizer_encoder.step()
+            optimizer_decoder.step()
+            optimizer_discriminator.step()
+
+            print('[%02d] encoder loss: %.5f | decoder loss: %.5f | discriminator loss: %.5f' % (i, loss_encoder, loss_decoder, loss_discriminator))
+
+
+        lr_encoder.step()
+        lr_decoder.step()
+        lr_discriminator.step()
+
+        margin *= decay_margin
+        equilibrium *= decay_equilibrium
+        if margin > equilibrium:
+            equilibrium = margin
+        lambda_mse *= decay_mse
+        if lambda_mse > 1:
+            lambda_mse = 1
+        
+        # save results
+        for j, (x, label) in enumerate(test_loader):
+            net.eval()
+
+            x = Variable(x, requires_grad=False).float().cuda()
+
+            out = x.data.cpu()
+            out = (out + 1) / 2
+            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), './images/original%s.png' % (i), nrow=8)
+
+            out = net(x) # out = x_tilde
+            out = out.data.cpu()
+            out = (out + 1) / 2
+            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), './images/reconstructed%s.png' % (i), nrow=8)
+
+            out = net(None, 100) # out = x_p
+            out = out.data.cpu()
+            out = (out + 1) / 2
+            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), './images/generated%s.png' % (i), nrow=8)
+
+            break
+
+    exit(0)

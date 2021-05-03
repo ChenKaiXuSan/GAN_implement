@@ -11,13 +11,13 @@ from torchvision.utils import save_image
 from torch.utils.data import DataLoader
 from torchvision import datasets
 # %%
-def get_Dataset(opt):
+def get_Dataset(opt, train=True):
 
     if opt.dataset == 'mnist':
         dst = datasets.MNIST(
             # 相对路径，以调用的文件位置为准
             root=opt.dataroot,
-            train=True,
+            train=train,
             download=True,
             transform=transform.Compose(
                 [transform.Resize(opt.img_size), transform.ToTensor(), transform.Normalize([0.5], [0.5])]
@@ -26,7 +26,7 @@ def get_Dataset(opt):
     elif opt.dataset == 'fashion':
         dst = datasets.FashionMNIST(
             root=opt.dataroot,
-            train=True,
+            train=train,
             download=True,
             # split='mnist',
             transform=transform.Compose(
@@ -36,7 +36,7 @@ def get_Dataset(opt):
     elif opt.dataset == 'cifar10':
         dst = datasets.CIFAR10(
             root=opt.dataroot,
-            train=True,
+            train=train,
             download=True,
             transform=transform.Compose(
                 [transform.Resize(opt.img_size), transform.ToTensor(), transform.Normalize(mean=[0.485, 0.456, 0.406],
