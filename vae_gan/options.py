@@ -28,7 +28,7 @@ parser.add_argument("--decay_mse",default=1,action="store",type=float,dest="deca
 parser.add_argument("--decay_margin",default=1,action="store",type=float,dest="decay_margin")
 parser.add_argument("--decay_equilibrium",default=1,action="store",type=float,dest="decay_equilibrium")
 
-parser.add_argument("--n_epochs", type=int, default=150, help="number of epochs of training")
+parser.add_argument("--n_epochs", type=int, default=10000, help="number of epochs of training")
 # parser.add_argument("--batch_size", type=int, default=64, help="size of the batches")
 # parser.add_argument("--lr", type=float, default=0.00005, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
@@ -48,7 +48,7 @@ parser.add_argument('--w_kld', type=float, default=1)
 parser.add_argument('--w_loss_g', type=float, default=0.01)
 parser.add_argument('--w_loss_gd', type=float, default=1)
 
-args = parser.parse_args([])
+args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
 print(args)

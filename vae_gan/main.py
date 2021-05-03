@@ -1,8 +1,7 @@
 # %% 
 import os
 
-from torch._C import wait
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 import sys
 sys.path.append('..')
