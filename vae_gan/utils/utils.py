@@ -1,6 +1,9 @@
 import torch
 import torchvision.utils as utils
 
+import os 
+import shutil
+
 def get_cuda(tensor):
     if torch.cuda.is_available():
         tensor = tensor.cuda()
@@ -32,3 +35,25 @@ def build_tensorboard():
 
     writer = SummaryWriter()
     return writer
+
+def del_folder(path, version):
+    '''
+    delete the folder which path/version
+
+    Args:
+        path (str): path
+        version (str): version
+    '''    
+    if os.path.exists(os.path.join(path, version)):
+        shutil.rmtree(os.path.join(path, version))
+    
+def make_folder(path, version):
+    '''
+    make folder which path/version
+
+    Args:
+        path (str): path
+        version (str): version
+    '''    
+    if not os.path.exists(os.path.join(path, version)):
+        os.makedirs(os.path.join(path, version))

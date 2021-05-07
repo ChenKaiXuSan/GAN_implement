@@ -39,9 +39,14 @@ random.seed(manualSeed)
 torch.manual_seed(manualSeed)
 
 # %%
-result = './images'
-if not os.path.exists(result):
-    os.makedirs(result, exist_ok=True)
+# delete the exists path
+# del_folder(args.sample_path, '')
+# del_folder('runs', '')
+
+# create dir if not exist
+make_folder(args.sample_path, args.real_image)
+make_folder(args.sample_path, args.generate_image)
+make_folder(args.sample_path, args.recon_image)
 
 # ----------- tensorboard ------------
 writer = build_tensorboard()
@@ -56,7 +61,7 @@ writer = build_tensorboard()
 
 train_loader = get_Dataset(args, train=True)
 test_loader = get_Dataset(args, train=False)
-print(len(train_loader))
+# print(len(train_loader))
 
 # %%
 net = VaeGan(z_size=args.z_size, recon_level=args.recon_level).cuda()
@@ -96,6 +101,7 @@ if __name__ == "__main__":
     decay_equilibrium = args.decay_equilibrium
 
     for i in range(n_epochs + 1):
+        print('Start training!')
         print('Epoch: %s' % (i))
         for j, (x, label) in enumerate (train_loader):
             net.train()
@@ -142,6 +148,7 @@ if __name__ == "__main__":
 
             # encoder 
             loss_encoder.backward(retain_graph=True)
+            optimizer_encoder.step()
             net.zero_grad() # cleanothers, so they are not afflicted by encoder loss 
 
             writer.add_scalar('loss_encoder', loss_encoder, i)
@@ -149,6 +156,7 @@ if __name__ == "__main__":
             # decoder 
             if train_dec:
                 loss_decoder.backward(retain_graph=True)
+                optimizer_decoder.step()
                 net.discriminator.zero_grad() # clean the discriminator
 
             # writer tensorboard
@@ -157,16 +165,17 @@ if __name__ == "__main__":
             # discriminator 
             if train_dis:
                 loss_discriminator.backward()
+                optimizer_discriminator.step()
             
             # writer tensorboard 
             writer.add_scalar('loss_discriminator', loss_discriminator, i)
             
-            # 这个地方存在问题，有可能
-            optimizer_encoder.step()
-            optimizer_decoder.step()
-            optimizer_discriminator.step()
+            # todo 这个地方存在问题，有可能
+            # optimizer_encoder.step()
+            # optimizer_decoder.step()
+            # optimizer_discriminator.step()
 
-            print('[%02d] encoder loss: %.5f | decoder loss: %.5f | discriminator loss: %.5f' % (i, loss_encoder, loss_decoder, loss_discriminator))
+            print('total epoch: [%02d] step: [%02d] | encoder loss: %.5f | decoder loss: %.5f | discriminator loss: %.5f' % (i, j, loss_encoder, loss_decoder, loss_discriminator))
 
         lr_encoder.step()
         lr_decoder.step()
@@ -188,17 +197,17 @@ if __name__ == "__main__":
 
             out = x.data.cpu()
             out = (out + 1) / 2
-            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), './images/original%s.png' % (i), nrow=8)
+            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), './images/real_image/original%s.png' % (i), nrow=8)
 
             out = net(x) # out = x_tilde
             out = out.data.cpu()
             out = (out + 1) / 2
-            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), './images/reconstructed%s.png' % (i), nrow=8)
+            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), './images/recon_image/reconstructed%s.png' % (i), nrow=8)
 
             out = net(None, 100) # out = x_p
             out = out.data.cpu()
             out = (out + 1) / 2
-            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), './images/generated%s.png' % (i), nrow=8)
+            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), './images/generate_image/generated%s.png' % (i), nrow=8)
 
             break
 

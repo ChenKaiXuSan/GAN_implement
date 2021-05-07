@@ -80,6 +80,12 @@ class Encoder(nn.Module):
         return super(Encoder, self).__call__(*args, **kwargs)
 
 class Decoder(nn.Module):
+    '''
+    decoder and generator
+
+    Args:
+        nn ([type]): [description]
+    '''    
     def __init__(self, z_size, size):
         super(Decoder, self).__init__()
         # start from B, z_size
