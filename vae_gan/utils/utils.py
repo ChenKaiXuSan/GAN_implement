@@ -26,3 +26,9 @@ def generate_samples(img_name, opt, E, D, G):
         x_p = G(z_p)
     
     utils.save_image(x_p.cpu(), img_name, normalize=True, nrow=6)
+
+def build_tensorboard():
+    from torch.utils.tensorboard import SummaryWriter
+
+    writer = SummaryWriter()
+    return writer

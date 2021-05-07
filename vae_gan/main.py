@@ -1,7 +1,7 @@
 # %% 
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import sys
 sys.path.append('..')
@@ -20,7 +20,7 @@ torch.cuda.manual_seed(8)
 
 from vae_gan.models.vae_gan import Discriminator, Encoder, VaeGan
 from vae_gan.dataset.dataset import get_Dataset
-from vae_gan.utils.utils import get_cuda, weights_init, generate_samples
+from vae_gan.utils.utils import *
 
 from torch.optim.lr_scheduler import ExponentialLR, MultiStepLR
 from torch.optim import RMSprop, Adam, SGD
@@ -39,13 +39,12 @@ random.seed(manualSeed)
 torch.manual_seed(manualSeed)
 
 # %%
-if not os.path.exists('./images'):
-    os.makedirs("./images", exist_ok=True)
+result = './images'
+if not os.path.exists(result):
+    os.makedirs(result, exist_ok=True)
 
-directory = './result'
-if not os.path.exists(directory):
-    os.makedirs(directory)
-
+# ----------- tensorboard ------------
+writer = build_tensorboard()
 # %%
 # manual_seed = random.randint(1, 10000)
 # random.seed(manual_seed)
@@ -121,7 +120,6 @@ if __name__ == "__main__":
                 disc_class_original=disc_class_original, disc_class_predicted=disc_class_predicted, \
                 disc_class_sampled=disc_class_sampled, mus=mus, variances=log_variances                        
             )
-
             
             # this is the most important part of the code 
             loss_encoder = torch.sum(kl)+torch.sum(mse)
@@ -146,14 +144,22 @@ if __name__ == "__main__":
             loss_encoder.backward(retain_graph=True)
             net.zero_grad() # cleanothers, so they are not afflicted by encoder loss 
 
+            writer.add_scalar('loss_encoder', loss_encoder, i)
+
             # decoder 
             if train_dec:
                 loss_decoder.backward(retain_graph=True)
                 net.discriminator.zero_grad() # clean the discriminator
 
+            # writer tensorboard
+            writer.add_scalar('loss_decoder', loss_decoder, i)
+
             # discriminator 
             if train_dis:
                 loss_discriminator.backward()
+            
+            # writer tensorboard 
+            writer.add_scalar('loss_discriminator', loss_discriminator, i)
             
             # 这个地方存在问题，有可能
             optimizer_encoder.step()
@@ -161,7 +167,6 @@ if __name__ == "__main__":
             optimizer_discriminator.step()
 
             print('[%02d] encoder loss: %.5f | decoder loss: %.5f | discriminator loss: %.5f' % (i, loss_encoder, loss_decoder, loss_discriminator))
-
 
         lr_encoder.step()
         lr_decoder.step()
