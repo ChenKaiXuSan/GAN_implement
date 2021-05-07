@@ -1,4 +1,5 @@
 import argparse
+from ast import parse
 import torch
 
 parser = argparse.ArgumentParser()
@@ -43,10 +44,18 @@ parser.add_argument("--sample_interval", type=int, default=400, help="interval b
 # parser.add_argument("--dcgan", action='store_false', help='use MLP')
 parser.add_argument("--dataset", type=str, choices=['mnist', 'fashion', 'cifar10'],
                     default='cifar10', help="dataset to use")
-parser.add_argument("--dataroot", type=str, default='../data/', help='path to dataset')
 parser.add_argument('--w_kld', type=float, default=1)
 parser.add_argument('--w_loss_g', type=float, default=0.01)
 parser.add_argument('--w_loss_gd', type=float, default=1)
+
+# Path
+parser.add_argument('--dataroot', type=str, default='../data', help='path to dataset')
+parser.add_argument('--log_path', type=str, default='./logs')
+parser.add_argument('--sample_path', type=str, default='./images')
+
+parser.add_argument('--real_image', type=str, default='real_image')
+parser.add_argument('--generate_image', type=str, default='generate_image')
+parser.add_argument('--recon_image', type=str, default='recon_image')
 
 args = parser.parse_args([])
 args.cuda = not args.no_cuda and torch.cuda.is_available()
