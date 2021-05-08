@@ -3,7 +3,7 @@ from ast import parse
 import torch
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--batch_size', type=int, default=128, help='input batch size for training')
+parser.add_argument('--batch_size', type=int, default=64, help='input batch size for training')
 parser.add_argument('--input_size', default=[3, 64, 64])
 parser.add_argument('--beta1', default=0.5, help='Beta1 hyperparam for Adam optimizers')
 
