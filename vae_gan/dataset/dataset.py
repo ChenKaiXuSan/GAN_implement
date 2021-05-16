@@ -43,6 +43,19 @@ def get_Dataset(opt, train=True):
                                      std=[0.229, 0.224, 0.225])]
             )
         )
+    elif opt.dataset == 'celeba':
+        dst = datasets.CelebA(
+            root=opt.dataroot,
+            train=train,
+            download=True,
+            transform=transform.Compose(
+                [
+                    transform.Resize(opt.img_size),
+                    transform.ToTensor(),
+                    transform.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                ]
+            )
+        )
 
     dataloader = DataLoader(
         dst,

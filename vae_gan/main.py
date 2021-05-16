@@ -40,8 +40,8 @@ torch.manual_seed(manualSeed)
 
 # %%
 # delete the exists path
-# del_folder(args.sample_path, '')
-# del_folder('runs', '')
+del_folder(args.sample_path, '')
+del_folder('runs', '')
 
 # create dir if not exist
 make_folder(args.sample_path, args.real_image)
@@ -100,8 +100,8 @@ if __name__ == "__main__":
     decay_lr = args.decay_lr
     decay_equilibrium = args.decay_equilibrium
 
+    print('Start training!')
     for i in range(n_epochs + 1):
-        print('Start training!')
         print('Epoch: %s' % (i))
         for j, (x, label) in enumerate (train_loader):
             net.train()
@@ -109,26 +109,33 @@ if __name__ == "__main__":
 
             x = Variable(x, requires_grad=False).float().cuda()
 
-            x_tilde, disc_class, disc_layer, mus, log_variances = net(x)
-        
+            x_tilde, disc_class, disc_layer, mus, log_variances = net(x) 
+            # * disc_layer 192, 16384
+            # * disc_class 192, 512
+
             # split so we can get the different parts
+            # * recon
             disc_layer_original = disc_layer[:batch_size]
             disc_layer_predicted = disc_layer[batch_size:-batch_size]
-            disc_layer_sampled = disc_layer[-batch_size]
+            disc_layer_sampled = disc_layer[-batch_size:]
 
+            # * gan
             disc_class_original = disc_class[:batch_size]
             disc_class_predicted = disc_class[batch_size:-batch_size]
-            disc_class_sampled = disc_class[-batch_size]
+            disc_class_sampled = disc_class[-batch_size:]
 
             nle, kl, mse, bce_dis_original, bce_dis_predicted, bce_dis_sampled = VaeGan.loss(
                 x, x_tilde=x_tilde, disc_layer_original=disc_layer_original, \
                 disc_layer_predicted=disc_layer_predicted, disc_layer_sampled=disc_layer_sampled, \
                 disc_class_original=disc_class_original, disc_class_predicted=disc_class_predicted, \
-                disc_class_sampled=disc_class_sampled, mus=mus, variances=log_variances                        
+                disc_class_sampled=disc_class_sampled,
+                mus=mus, variances=log_variances,
+                disc_layer = disc_layer, disc_class = disc_class
             )
             
             # this is the most important part of the code 
-            loss_encoder = torch.sum(kl)+torch.sum(mse)
+            # todo
+            loss_encoder = torch.mean(torch.sum(kl) +torch.sum(mse))
             loss_discriminator = torch.sum(bce_dis_original) + torch.sum(bce_dis_predicted) + torch.sum(bce_dis_sampled)
             loss_decoder = torch.sum(lambda_mse * mse) - (1.0 - lambda_mse) * loss_discriminator
 
@@ -148,7 +155,7 @@ if __name__ == "__main__":
 
             # encoder 
             loss_encoder.backward(retain_graph=True)
-            optimizer_encoder.step()
+            # optimizer_encoder.step()
             net.zero_grad() # cleanothers, so they are not afflicted by encoder loss 
 
             writer.add_scalar('loss_encoder', loss_encoder, i)
@@ -156,7 +163,7 @@ if __name__ == "__main__":
             # decoder 
             if train_dec:
                 loss_decoder.backward(retain_graph=True)
-                optimizer_decoder.step()
+                # optimizer_decoder.step()
                 net.discriminator.zero_grad() # clean the discriminator
 
             # writer tensorboard
@@ -165,15 +172,15 @@ if __name__ == "__main__":
             # discriminator 
             if train_dis:
                 loss_discriminator.backward()
-                optimizer_discriminator.step()
+                # optimizer_discriminator.step()
             
             # writer tensorboard 
             writer.add_scalar('loss_discriminator', loss_discriminator, i)
             
             # todo 这个地方存在问题，有可能
-            # optimizer_encoder.step()
-            # optimizer_decoder.step()
-            # optimizer_discriminator.step()
+            optimizer_encoder.step()
+            optimizer_decoder.step()
+            optimizer_discriminator.step()
 
             print('total epoch: [%02d] step: [%02d] | encoder loss: %.5f | decoder loss: %.5f | discriminator loss: %.5f' % (i, j, loss_encoder, loss_decoder, loss_discriminator))
 

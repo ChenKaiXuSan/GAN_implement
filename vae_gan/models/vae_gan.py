@@ -1,10 +1,9 @@
 # %%
-from numpy.testing._private.utils import requires_memory
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
 from torch.autograd import Variable
-import numpy as np 
+import numpy as np
 # %%
 class EncoderBlock(nn.Module):
     def __init__(self, channel_in, channel_out):
@@ -203,10 +202,26 @@ class VaeGan(nn.Module):
                 if hasattr(m, "bias") and m.bias is not None and m.bias.requires_grad:
                     nn.init.constant_(m.bias, 0.0)
 
-    def reparameterize(self, mu, logvar):
-        logvar = logvar.mul(0.5).exp_()
-        eps = Variable(logvar.data.new(logvar.size()).normal_())
-        return eps.mul(logvar).add_(mu)
+# type: torch.Tensor
+    def reparameterize(self, mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
+        '''
+        reparameterization trick to sample from N(mu, var) from N(0,1)
+
+        Args:
+            mu (Tensor): mean of the latent Gaussian [B x D]
+            logvar (Tensor): standard deviation of the latent Gaussian [B x D]
+
+        Returns:
+            [Tensor]: B x D
+        '''        
+        std = logvar.mul(0.5).exp_()
+
+        # eps = Variable(std.data.new(std.size()).normal_())
+        eps = torch.randn_like(std)
+
+        # out = eps.mul(std).add_(mu)
+        out = eps * std + mu 
+        return out
 
     def forward(self, x, gen_size=10):
         if self.training:
@@ -236,7 +251,7 @@ class VaeGan(nn.Module):
         return super(VaeGan, self).__call__(*args, **kwargs)
 
     @staticmethod
-    def loss(x, x_tilde, disc_layer_original, disc_layer_predicted, disc_layer_sampled, disc_class_original, disc_class_predicted, disc_class_sampled, mus, variances):
+    def loss(x, x_tilde, disc_layer_original, disc_layer_predicted, disc_layer_sampled, disc_class_original, disc_class_predicted, disc_class_sampled,disc_layer, disc_class, mus, variances):
         
         # reconstruction error, not used for the loss but useful to evaluate quality
         nle = 0.5 * (x.view(len(x), -1) - x_tilde.view(len(x_tilde), -1)) ** 2
@@ -244,13 +259,39 @@ class VaeGan(nn.Module):
         # kl-divergence
         kl = -0.5 * torch.sum(-variances.exp() - torch.pow(mus, 2) + variances + 1, 1)
 
+        kl_loss = nn.KLDivLoss(reduction='none')
+        kl_output = kl_loss(variances, mus)
+        kl_output_1 = kl_loss(mus, variances)
+        
         # mse between intermediate layers 
         mse = torch.sum(0.5 * (disc_layer_original - disc_layer_predicted) ** 2, 1)
+
+        # encoder loss, compare the recon and real x
+        encoder_loss = nn.MSELoss()
+        encoder_loss_output = encoder_loss(disc_layer_predicted, disc_layer_original)
+
+        # decoder loss 
+        decoder_loss = kl_loss
+        # decoder_loss_output = decoder_loss(mus, variances)
+
+        # vae loss 
+        # vae_loss = encoder_loss_output + decoder_loss_output
 
         # bce for decoder and discriminator for original and reconstructed 
         bce_dis_original = -torch.log(disc_class_original + 1e-3)
         bce_dis_predicted = -torch.log(1 - disc_class_predicted + 1e-3)
         bce_dis_sampled = -torch.log(1 - disc_class_sampled + 1e-3)
+
+
+        valid = Variable(torch.Tensor(x.size(0), 1). fill_(1.0), requires_grad = False)
+        fake = Variable(torch.Tensor(x.size(0), 1).fill_(0.0), requires_grad = False)
+
+        # gan loss, compare the dis and x_tilde
+        # todo 
+        # g_loss = nn.BCELoss(disc_class, valid)
+        # d_loss = nn.BCELoss(disc_class, fake)
+
+        
 
         return nle, kl, mse, bce_dis_original, bce_dis_predicted, bce_dis_sampled
             
