@@ -1,5 +1,4 @@
 # %%
-from socket import TCP_SYNCNT
 import sys
 sys.path.append('..')
 sys.path.append('.')
@@ -56,7 +55,6 @@ class DecoderBlock(nn.Module):
         ten = self.conv(ten)
         ten = self.bn(ten)
         ten = self.relu(ten)
-        # ten = F.relu(ten, True)
         return ten
 
 # %%
