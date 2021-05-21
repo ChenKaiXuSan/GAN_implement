@@ -4,7 +4,6 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-
 import torch
 import torchvision.transforms as transform
 from torchvision.utils import save_image
@@ -73,7 +72,7 @@ import numpy as np
 if __name__ == "__main__":
     class opt:
         dataroot = '../../data'
-        dataset = 'cifar10'
+        dataset = 'mnist'
         img_size = 64
         batch_size = 10
 

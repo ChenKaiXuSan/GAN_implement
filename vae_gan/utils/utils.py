@@ -57,3 +57,19 @@ def make_folder(path, version):
     '''    
     if not os.path.exists(os.path.join(path, version)):
         os.makedirs(os.path.join(path, version))
+
+def tensor2var(x, grad=False):
+    '''
+    put tensor to gpu, and set grad to false
+
+    Args:
+        x (tensor): input tensor
+        grad (bool, optional):  Defaults to False.
+
+    Returns:
+        tensor: tensor in gpu and set grad to false 
+    '''    
+    if torch.cuda.is_available():
+        x = x.cuda()
+        x.requires_grad_(grad)
+    return x
