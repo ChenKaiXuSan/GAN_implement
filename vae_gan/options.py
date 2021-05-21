@@ -54,7 +54,7 @@ parser.add_argument('--real_image', type=str, default='real_image')
 parser.add_argument('--generate_image', type=str, default='generate_image')
 parser.add_argument('--recon_image', type=str, default='recon_image')
 
-args = parser.parse_args([])
+args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
 print(args)
