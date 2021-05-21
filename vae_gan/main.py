@@ -117,9 +117,9 @@ if __name__ == "__main__":
             generator.train()
             batch_size = img.size()[0]
 
-            ones_label = tensor2var(torch.ones(batch_size, 1))
-            zeros_label = tensor2var(torch.zeros(batch_size, 1))
-            zeros_label_1 = tensor2var(torch.zeros(64, 1))
+            ones_label = tensor2var(torch.ones(batch_size, args.channels))
+            zeros_label = tensor2var(torch.zeros(batch_size, args.channels))
+            zeros_label_1 = tensor2var(torch.zeros(batch_size, args.channels))
 
             datav = tensor2var(img)
 
