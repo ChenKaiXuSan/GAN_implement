@@ -44,7 +44,7 @@ parser.add_argument("--dataset", type=str, choices=['mnist', 'fashion', 'cifar10
 parser.add_argument('--w_kld', type=float, default=1)
 parser.add_argument('--w_loss_g', type=float, default=0.01)
 parser.add_argument('--w_loss_gd', type=float, default=1)
-parser.add_argument('gpu', type=int, default=0)
+parser.add_argument('--gpu', type=str, default='0')
 
 # Path
 parser.add_argument('--dataroot', type=str, default='../data', help='path to dataset')
