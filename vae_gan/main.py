@@ -1,7 +1,7 @@
 # %% 
 import os
 
-from torch.nn.modules.loss import BCELoss
+from torch.nn.modules.loss import BCELoss, MSELoss
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
@@ -90,11 +90,11 @@ lr_discriminator = ExponentialLR(optimizer=optimizer_discriminator, gamma=args.d
 
 # %%
 real_batch = next(iter(train_loader))
-z_fixed = Variable(torch.randn((64, 128)).cuda())
-x_fixed = Variable(real_batch[0]).cuda()
 
 # loss function 
 bce_loss = nn.BCELoss().cuda()
+mse_loss = nn.MSELoss().cuda()
+
 # %%
 # ------------ training loop ------------
 
@@ -119,14 +119,14 @@ if __name__ == "__main__":
 
             ones_label = tensor2var(torch.ones(batch_size, 1))
             zeros_label = tensor2var(torch.zeros(batch_size, 1))
-            zeros_label_1 = tensor2var(torch.zeros(64, 1))
+            zeros_label_1 = tensor2var(torch.zeros(batch_size, 1))
 
             datav = tensor2var(img)
 
             mean, logvar, rec_enc = generator(datav)
 
             # from random noise 
-            z_p = tensor2var(torch.randn(64, 128))
+            z_p = tensor2var(torch.randn(batch_size, 128))
             x_p_tilda = generator.decoder(z_p)
 
             # * ----- train discriminator -----
@@ -156,19 +156,19 @@ if __name__ == "__main__":
             output = discriminator(datav)[0]
             loss_discriminator_real = bce_loss(output, ones_label)
 
-            writer.add_scalar('loss_discriminator_real', loss_discriminator_real, i)
+            # writer.add_scalar('loss_discriminator_real', loss_discriminator_real, i)
 
             # encoder decoder data, to 0
             output = discriminator(rec_enc)[0]
             loss_discriminator_rec_enc = bce_loss(output, zeros_label)
 
-            writer.add_scalar('loss_discriminator_rec_enc', loss_discriminator_rec_enc, i)
+            # writer.add_scalar('loss_discriminator_rec_enc', loss_discriminator_rec_enc, i)
 
             # from random noise, to 0
             output = discriminator(x_p_tilda)[0]
             loss_discriminator_noise = bce_loss(output, zeros_label_1)
 
-            writer.add_scalar('loss_discriminator_noise', loss_discriminator_noise, i)
+            # writer.add_scalar('loss_discriminator_noise', loss_discriminator_noise, i)
 
             gan_loss = loss_discriminator_real + loss_discriminator_rec_enc + loss_discriminator_noise
 
@@ -176,9 +176,10 @@ if __name__ == "__main__":
             x_l_tilda = discriminator(rec_enc)[1]
             x_l = discriminator(datav)[1]
 
-            loss_rec = ((x_l_tilda - x_l) ** 2).mean()
+            # loss_rec = ((x_l_tilda - x_l) ** 2).mean()
+            loss_mse = mse_loss(x_l_tilda, x_l)
 
-            loss_decoder = gamma * loss_rec - gan_loss
+            loss_decoder = gamma * loss_mse - gan_loss
 
             optimizer_decoder.zero_grad()
             loss_decoder.backward(retain_graph=True)
@@ -193,16 +194,20 @@ if __name__ == "__main__":
             x_l_tilda = discriminator(rec_enc)[1]
             x_l = discriminator(datav)[1]
 
-            loss_rec = ((x_l_tilda - x_l) ** 2).mean() # mse
+            # loss_rec = ((x_l_tilda - x_l) ** 2).mean() # mse
+            loss_mse = mse_loss(x_l_tilda, x_l)
 
-            writer.add_scalar('loss_rec', loss_rec, i)
+            # writer.add_scalar('loss_rec', loss_rec, i)
 
-            prior_loss = 1 + logvar - mean.pow(2) - logvar.exp()
-            prior_loss = (-0.5 * torch.sum(prior_loss)) / torch.numel(mean.data) # kl
+            # prior_loss = 1 + logvar - mean.pow(2) - logvar.exp()
+            # prior_loss = (-0.5 * torch.sum(prior_loss)) / torch.numel(mean.data) # kl
 
-            writer.add_scalar('prior_loss', prior_loss, i)
+            kl = -0.5 * torch.sum(-logvar.exp() - torch.pow(mean, 2) + logvar + 1) / torch.numel(mean.data)
 
-            loss_encoder = prior_loss + 5 * loss_rec
+            # writer.add_scalar('prior_loss', prior_loss, i)
+
+            # loss_encoder = prior_loss + 5 * loss_rec
+            loss_encoder = loss_mse + kl
 
             optimizer_encoder.zero_grad()
             loss_encoder.backward(retain_graph=True)
@@ -212,17 +217,10 @@ if __name__ == "__main__":
 
             print('total epoch: [%02d] step: [%02d] | encoder loss: %.5f | decoder loss: %.5f | discriminator loss: %.5f' % (i, j, loss_encoder, loss_decoder, gan_loss))
 
-        lr_encoder.step()
-        lr_decoder.step()
-        lr_discriminator.step()
-
-        # margin *= decay_margin
-        # equilibrium *= decay_equilibrium
-        # if margin > equilibrium:
-        #     equilibrium = margin
-        # lambda_mse *= decay_mse
-        # if lambda_mse > 1:
-        #     lambda_mse = 1
+        # lr衰减，先不用
+        # lr_encoder.step()
+        # lr_decoder.step()
+        # lr_discriminator.step()
         
         # save results
         for j, (x, label) in enumerate(test_loader):
@@ -235,12 +233,15 @@ if __name__ == "__main__":
             save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), './images/real_image/original%s.png' % (i), nrow=8)
 
             # save x_fixed image, from encoder > decoder
-            out = generator(x_fixed)[2] # out = x_tilde
+            out = generator(datav)[2] # out = x_tilde
+            out = out.detach()
             out = (out + 1) / 2
             save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), './images/recon_image/reconstructed%s.png' % (i), nrow=8)
 
             # save z_fixed image, from noise z > decoer
+            z_fixed = tensor2var(torch.randn((args.batch_size, args.z_size)))
             out = generator.decoder(z_fixed) # out = x_p
+            out = out.detach()
             out = (out + 1) / 2
             save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), './images/generate_image/generated%s.png' % (i), nrow=8)
 

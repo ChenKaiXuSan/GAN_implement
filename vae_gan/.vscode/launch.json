@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "${workspaceRoot}/main.py",
             "console": "integratedTerminal",
-            "args": ["--dataset", "cifar10", "--channels", "3"]
+            "args": ["--dataset", "cifar10", "--channels", "3", "--batch_size", "32"]
         }
     ]
 }
