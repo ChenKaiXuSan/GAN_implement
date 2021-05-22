@@ -117,9 +117,9 @@ if __name__ == "__main__":
             generator.train()
             batch_size = img.size()[0]
 
-            ones_label = tensor2var(torch.ones(batch_size, args.channels))
-            zeros_label = tensor2var(torch.zeros(batch_size, args.channels))
-            zeros_label_1 = tensor2var(torch.zeros(64, args.channels))
+            ones_label = tensor2var(torch.ones(batch_size, 1))
+            zeros_label = tensor2var(torch.zeros(batch_size, 1))
+            zeros_label_1 = tensor2var(torch.zeros(64, 1))
 
             datav = tensor2var(img)
 
@@ -129,7 +129,7 @@ if __name__ == "__main__":
             z_p = tensor2var(torch.randn(64, 128))
             x_p_tilda = generator.decoder(z_p)
 
-            # * discriminator loss
+            # * ----- train discriminator -----
             # real data, to 1
             output = discriminator(datav)[0]
             loss_discriminator_real = bce_loss(output, ones_label)
@@ -151,7 +151,7 @@ if __name__ == "__main__":
 
             writer.add_scalar('gan_loss', gan_loss, i)
 
-            # * decoder loss 
+            # * ----- train decoder -----
             # real data, to 1.
             output = discriminator(datav)[0]
             loss_discriminator_real = bce_loss(output, ones_label)
@@ -186,19 +186,19 @@ if __name__ == "__main__":
 
             writer.add_scalar('loss_decoder', loss_decoder, i)
 
-            # * encoder loss 
+            # * ----- train encoder -----
             mean, logvar, rec_enc = generator(datav)
 
             # logvar 
             x_l_tilda = discriminator(rec_enc)[1]
             x_l = discriminator(datav)[1]
 
-            loss_rec = ((x_l_tilda - x_l) ** 2).mean()
+            loss_rec = ((x_l_tilda - x_l) ** 2).mean() # mse
 
             writer.add_scalar('loss_rec', loss_rec, i)
 
             prior_loss = 1 + logvar - mean.pow(2) - logvar.exp()
-            prior_loss = (-0.5 * torch.sum(prior_loss)) / torch.numel(mean.data)
+            prior_loss = (-0.5 * torch.sum(prior_loss)) / torch.numel(mean.data) # kl
 
             writer.add_scalar('prior_loss', prior_loss, i)
 
