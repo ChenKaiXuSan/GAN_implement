@@ -119,7 +119,7 @@ if __name__ == "__main__":
 
             ones_label = tensor2var(torch.ones(batch_size, args.channels))
             zeros_label = tensor2var(torch.zeros(batch_size, args.channels))
-            zeros_label_1 = tensor2var(torch.zeros(batch_size, args.channels))
+            zeros_label_1 = tensor2var(torch.zeros(64, args.channels))
 
             datav = tensor2var(img)
 
