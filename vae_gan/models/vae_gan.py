@@ -182,7 +182,7 @@ class Discriminator(nn.Module):
         )
 
         self.fc2 = nn.Sequential(
-            nn.Linear(512, channel_in), # todo
+            nn.Linear(512, 1), # todo
             nn.Sigmoid()
         )
     
