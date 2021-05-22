@@ -1,8 +1,5 @@
 # %% 
 import os
-
-from torch.nn.modules.loss import BCELoss, MSELoss
-
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import sys
@@ -13,8 +10,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import random
-import torchvision.utils as utils
-from torch.autograd import Variable, variable
 
 np.random.seed(8)
 torch.manual_seed(8)
@@ -26,13 +21,11 @@ from utils.utils import *
 
 from torch.optim.lr_scheduler import ExponentialLR, MultiStepLR
 from torch.optim import RMSprop, Adam, SGD
-from torchvision.utils import make_grid
 import torchvision.utils as vutils
 from torchvision.utils import save_image
 
 from options import args
 
-import argparse
 # %%
 # set random seed for reproducibility
 manualSeed = 999
@@ -42,22 +35,18 @@ torch.manual_seed(manualSeed)
 
 # %%
 # delete the exists path
-del_folder(args.sample_path, '')
-del_folder('runs', '')
+# del_folder(args.sample_path, args.version)
+# del_folder('runs', '')
 
 # create dir if not exist
-make_folder(args.sample_path, args.real_image)
-make_folder(args.sample_path, args.generate_image)
-make_folder(args.sample_path, args.recon_image)
+make_folder(args.sample_path, args.version)
 
 # ----------- tensorboard ------------
 writer = build_tensorboard()
 
 # ------------ dataloader ------------
-
 train_loader = get_Dataset(args, train=True)
 test_loader = get_Dataset(args, train=False)
-# print(len(train_loader))
 
 # %%
 # ------------ network ------------
@@ -85,30 +74,22 @@ lr_encoder = ExponentialLR(optimizer=optimizer_encoder, gamma=args.decay_lr)
 optimizer_decoder = RMSprop(params=generator.decoder.parameters(), lr=args.lr, alpha=0.9, eps=1e-8, weight_decay=0, momentum=0, centered=False)
 lr_decoder = ExponentialLR(optimizer=optimizer_decoder, gamma=args.decay_lr)
 
-optimizer_discriminator = RMSprop(params=generator.discriminator.parameters(), lr=args.lr, alpha=0.9, eps=1e-8, weight_decay=0, momentum=0, centered=False)
+optimizer_discriminator = RMSprop(params=discriminator.parameters(), lr=args.lr, alpha=0.9, eps=1e-8, weight_decay=0, momentum=0, centered=False)
 lr_discriminator = ExponentialLR(optimizer=optimizer_discriminator, gamma=args.decay_lr)
 
 # %%
 real_batch = next(iter(train_loader))
 
-# loss function 
+# ------------ loss function ------------
 bce_loss = nn.BCELoss().cuda()
 mse_loss = nn.MSELoss().cuda()
 
 # %%
 # ------------ training loop ------------
-
 if __name__ == "__main__":
     
     z_size = args.z_size
-    recon_level = args.recon_level
-    decay_mse = args.decay_mse
-    decay_margin = args.decay_margin
     n_epochs = args.n_epochs
-    lambda_mse = args.lambda_mse
-    lr = args.lr
-    decay_lr = args.decay_lr
-    decay_equilibrium = args.decay_equilibrium
 
     print('Start training!')
     for i in range(n_epochs + 1):

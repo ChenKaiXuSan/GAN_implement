@@ -25,19 +25,12 @@ class EncoderBlock(nn.Module):
         self.relu = nn.LeakyReLU(0.2)
 
     def forward(self, ten, out=False, t=False):
-        # here we want to be able to take an intermediate output for reconstruction error
-        if out:
-            ten = self.conv(ten)
-            ten_out = ten
-            ten = self.bn(ten)
-            ten = F.relu(ten, False)
-            return ten, ten_out
-        else:
-            ten = self.conv(ten)
-            ten = self.bn(ten)
-            ten = self.relu(ten)
-            # ten = F.relu(ten, False)
-            return ten
+
+        ten = self.conv(ten)
+        ten = self.bn(ten)
+        ten = self.relu(ten)
+
+        return ten
 
 class DecoderBlock(nn.Module):
     '''
@@ -47,7 +40,7 @@ class DecoderBlock(nn.Module):
     def __init__(self, channel_in, channel_out):
         super(DecoderBlock, self).__init__()
         # transpose convolution to double the dimensions
-        self.conv = nn.ConvTranspose2d(channel_in, channel_out, kernel_size=5, padding=2, stride=2, output_padding=1, bias=False)
+        self.conv = nn.ConvTranspose2d(channel_in, channel_out, kernel_size=5, padding=2, stride=2, bias=False)
         self.bn = nn.BatchNorm2d(channel_out, momentum=0.9)
         self.relu = nn.LeakyReLU(0.2)
 
@@ -117,7 +110,7 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         # start from B, z_size
         self.fc = nn.Sequential(
-            nn.Linear(in_features=z_size, out_features=8 * 8 * size, bias=True),
+            nn.Linear(in_features=z_size, out_features=8 * 8 * size),
             nn.BatchNorm1d(num_features=8 * 8 * size, momentum=0.9),
             nn.LeakyReLU(0.2),
         )
@@ -185,28 +178,6 @@ class Discriminator(nn.Module):
             nn.Linear(512, 1), # todo
             nn.Sigmoid()
         )
-    
-    # def forward(self, ten_orig, ten_predicted, ten_sampled, mode='REC'):
-        # if mode == "REC":
-        #     ten = torch.cat((ten_orig, ten_predicted, ten_sampled), 0)
-        #     for i, lay in enumerate(self.conv):
-        #         # we take the 9th layer as one of the outputs
-        #         if i == self.recon_level:
-        #             ten, layer_ten = lay(ten, True)
-        #             # we need the layer representations just for the original and reconstructed,
-        #             # flatten, because it's a convolutional shape
-        #             layer_ten = layer_ten.view(len(layer_ten), -1)
-        #             return layer_ten
-        #         else:
-        #             ten = lay(ten)
-        # else:
-        #     ten = torch.cat((ten_orig, ten_predicted, ten_sampled), 0)
-        #     for i, lay in enumerate(self.conv):
-        #         ten = lay(ten)
-
-        #     ten = ten.view(len(ten), -1)
-        #     ten = self.fc(ten)
-        #     return torch.sigmoid(ten)
 
     def forward(self, ten):
         batch_size = ten.size()[0]
@@ -258,7 +229,6 @@ class VaeGan(nn.Module):
                 if hasattr(m, "bias") and m.bias is not None and m.bias.requires_grad:
                     nn.init.constant_(m.bias, 0.0)
 
-# type: torch.Tensor
     def reparameterize(self, mean: torch.Tensor, logvar: torch.Tensor, eps: torch.Tensor) -> torch.Tensor:
         '''
         reparameterization trick to sample from N(mu, var) from N(0,1)
@@ -277,41 +247,16 @@ class VaeGan(nn.Module):
         # eps = torch.randn_like(std)
         eps = eps
         
-
-        # out = eps.mul(std).add_(mu)
         out = eps * std + mean
         return out
 
     def forward(self, x, gen_size=10):
-        #! if self.training:
-        #     mus, log_variances = self.encoder(x)
-        #     z = self.reparameterize(mus, logvar=log_variances)
-        #     x_tilde = self.decoder(z)
-
-        #     z_p = Variable(torch.randn(len(x), self.z_size).cuda(), requires_grad = True) 
-        #     x_p = self.decoder(z_p)
-
-        #     disc_layer = self.discriminator(x, x_tilde, x_p, "REC") # discriminator for reconstruction
-        #     disc_class = self.discriminator(x, x_tilde, x_p, "GAN")
-
-        #     return x_tilde, disc_class, disc_layer, mus, log_variances
-        # else:
-        #     if x is None:
-        #         z_p = Variable(torch.randn(gen_size, self.z_size).cuda(), requires_grad=False) # just sample and decode
-        #         x_p = self.decoder(z_p)
-        #         return x_p
-        #     else:
-        #         mus, log_variances = self.encoder(x)
-        #         z = self.reparameterize(mus, log_variances)
-        #         x_tilde = self.decoder(z)
-        #         return x_tilde
         batch_size = x.size()[0]
+
         z_mean, z_logvar = self.encoder(x)
 
         # sampling epsilon from normal distribution
-        # std = z_logvar.mul(0.5).exp_()
         epsilon = tensor2var(torch.randn(batch_size, self.z_size)) # just sample and decode
-        # z = z_mean + std * epsilon
 
         z = self.reparameterize(mean= z_mean, logvar=z_logvar, eps = epsilon)
 
@@ -322,52 +267,6 @@ class VaeGan(nn.Module):
     def __call__(self, *args, **kwargs):
         return super(VaeGan, self).__call__(*args, **kwargs)
 
-# !
-    @staticmethod
-    def loss(x, x_tilde, disc_layer_original, disc_layer_predicted, disc_layer_sampled, disc_class_original, disc_class_predicted, disc_class_sampled,disc_layer, disc_class, mus, variances):
-        
-        # reconstruction error, not used for the loss but useful to evaluate quality
-        nle = 0.5 * (x.view(len(x), -1) - x_tilde.view(len(x_tilde), -1)) ** 2
-
-        # kl-divergence
-        kl = -0.5 * torch.sum(-variances.exp() - torch.pow(mus, 2) + variances + 1, 1)
-
-        kl_loss = nn.KLDivLoss(reduction='none')
-        kl_output = kl_loss(variances, mus)
-        kl_output_1 = kl_loss(mus, variances)
-        
-        # mse between intermediate layers 
-        mse = torch.sum(0.5 * (disc_layer_original - disc_layer_predicted) ** 2, 1)
-
-        # encoder loss, compare the recon and real x
-        encoder_loss = nn.MSELoss()
-        encoder_loss_output = encoder_loss(disc_layer_predicted, disc_layer_original)
-
-        # decoder loss 
-        decoder_loss = kl_loss
-        # decoder_loss_output = decoder_loss(mus, variances)
-
-        # vae loss 
-        # vae_loss = encoder_loss_output + decoder_loss_output
-
-        # bce for decoder and discriminator for original and reconstructed 
-        bce_dis_original = -torch.log(disc_class_original + 1e-3)
-        bce_dis_predicted = -torch.log(1 - disc_class_predicted + 1e-3)
-        bce_dis_sampled = -torch.log(1 - disc_class_sampled + 1e-3)
-
-
-        valid = Variable(torch.Tensor(x.size(0), 1). fill_(1.0), requires_grad = False)
-        fake = Variable(torch.Tensor(x.size(0), 1).fill_(0.0), requires_grad = False)
-
-        # gan loss, compare the dis and x_tilde
-        # todo 
-        # g_loss = nn.BCELoss(disc_class, valid)
-        # d_loss = nn.BCELoss(disc_class, fake)
-
-        
-
-        return nle, kl, mse, bce_dis_original, bce_dis_predicted, bce_dis_sampled
-            
 # %%
 if __name__ == "__main__":
     # init net work
@@ -380,4 +279,3 @@ if __name__ == "__main__":
     datav = tensor2var(torch.randn(64, 1, 64, 64))
     mean, logvar, rec_enc = generator(datav)
     print(mean, logvar, rec_enc)
-# %%

@@ -50,6 +50,8 @@ parser.add_argument('--dataroot', type=str, default='../data', help='path to dat
 parser.add_argument('--log_path', type=str, default='./logs')
 parser.add_argument('--sample_path', type=str, default='./images')
 
+parser.add_argument('--version', type=str, default='mnist_')
+
 parser.add_argument('--real_image', type=str, default='real_image')
 parser.add_argument('--generate_image', type=str, default='generate_image')
 parser.add_argument('--recon_image', type=str, default='recon_image')

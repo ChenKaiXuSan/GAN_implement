@@ -4,6 +4,8 @@ import torchvision.utils as utils
 import os 
 import shutil
 
+from options import args
+
 def get_cuda(tensor):
     if torch.cuda.is_available():
         tensor = tensor.cuda()
@@ -56,7 +58,9 @@ def make_folder(path, version):
         version (str): version
     '''    
     if not os.path.exists(os.path.join(path, version)):
-        os.makedirs(os.path.join(path, version))
+        os.makedirs(os.path.join(path, version, args.real_image))
+        os.makedirs(os.path.join(path, version, args.generate_image))
+        os.makedirs(os.path.join(path, version, args.recon_image))
 
 def tensor2var(x, grad=False):
     '''
