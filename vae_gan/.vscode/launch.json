@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "${workspaceRoot}/main.py",
             "console": "integratedTerminal",
-            "args": ["--dataset", "mnist", "--channels", "1"]
+            "args": ["--dataset", "cifar10", "--channels", "3"]
         }
     ]
 }
