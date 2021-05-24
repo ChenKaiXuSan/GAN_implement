@@ -19,12 +19,11 @@ class EncoderBlock(nn.Module):
     def __init__(self, channel_in, channel_out):
         super(EncoderBlock, self).__init__()
         # convolution to halve the dimensions
-        self.conv = nn.Conv2d(in_channels=channel_in, out_channels=channel_out, kernel_size=5, padding=2, stride=2,
-         bias=False)
+        self.conv = nn.Conv2d(in_channels=channel_in, out_channels=channel_out, kernel_size=5, padding=2, stride=2)
         self.bn = nn.BatchNorm2d(num_features=channel_out, momentum=0.9)
         self.relu = nn.LeakyReLU(0.2)
 
-    def forward(self, ten, out=False, t=False):
+    def forward(self, ten):
 
         ten = self.conv(ten)
         ten = self.bn(ten)
@@ -40,7 +39,7 @@ class DecoderBlock(nn.Module):
     def __init__(self, channel_in, channel_out):
         super(DecoderBlock, self).__init__()
         # transpose convolution to double the dimensions
-        self.conv = nn.ConvTranspose2d(channel_in, channel_out, kernel_size=5, padding=2, stride=2, bias=False)
+        self.conv = nn.ConvTranspose2d(channel_in, channel_out, kernel_size=5, padding=2, stride=2)
         self.bn = nn.BatchNorm2d(channel_out, momentum=0.9)
         self.relu = nn.LeakyReLU(0.2)
 
