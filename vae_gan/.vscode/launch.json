@@ -12,5 +12,13 @@
             "console": "integratedTerminal",
             "args": ["--dataset", "cifar10", "--channels", "3", "--batch_size", "32"]
         }
+        {
+            "name": "Python: vae_gan/G_D",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/main_G_D.py",
+            "console": "integratedTerminal",
+            "args": ["--dataset", "cifar10", "--channels", "3", "--batch_size", "32"]
+        }
     ]
 }

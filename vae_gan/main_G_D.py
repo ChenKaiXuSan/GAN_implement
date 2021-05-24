@@ -77,9 +77,6 @@ lr_decoder = ExponentialLR(optimizer=optimizer_decoder, gamma=args.decay_lr)
 optimizer_discriminator = RMSprop(params=discriminator.parameters(), lr=args.lr, alpha=0.9, eps=1e-8, weight_decay=0, momentum=0, centered=False)
 lr_discriminator = ExponentialLR(optimizer=optimizer_discriminator, gamma=args.decay_lr)
 
-# %%
-real_batch = next(iter(train_loader))
-
 # ------------ loss function ------------
 bce_loss = nn.BCELoss().cuda()
 mse_loss = nn.MSELoss().cuda()
@@ -104,70 +101,6 @@ if __name__ == "__main__":
 
             datav = tensor2var(img)
 
-            mean, logvar, rec_enc = generator(datav)
-
-            # from random noise 
-            z_p = tensor2var(torch.randn(batch_size, 128))
-            x_p_tilda = generator.decoder(z_p)
-
-            # * ----- train discriminator -----
-            # real data, to 1
-            output = discriminator(datav)[0]
-            loss_discriminator_real = bce_loss(output, ones_label)
-
-            # encoder data, to 0
-            output = discriminator(rec_enc)[0]
-            loss_discriminator_rec_enc = bce_loss(output, zeros_label)
-
-            # from random noise, to 0
-            output = discriminator(x_p_tilda)[0]
-            loss_discriminator_noise = bce_loss(output, zeros_label_1)
-
-            # gan loss, like paper
-            gan_loss = loss_discriminator_real + loss_discriminator_rec_enc + loss_discriminator_noise
-
-            optimizer_discriminator.zero_grad()
-            gan_loss.backward(retain_graph = True)
-            optimizer_discriminator.step()
-
-            writer.add_scalar('gan_loss', gan_loss, i)
-
-            # * ----- train decoder -----
-            # real data, to 1.
-            output = discriminator(datav)[0]
-            loss_discriminator_real = bce_loss(output, ones_label)
-
-            # writer.add_scalar('loss_discriminator_real', loss_discriminator_real, i)
-
-            # encoder decoder data, to 0
-            output = discriminator(rec_enc)[0]
-            loss_discriminator_rec_enc = bce_loss(output, zeros_label)
-
-            # writer.add_scalar('loss_discriminator_rec_enc', loss_discriminator_rec_enc, i)
-
-            # from random noise, to 0
-            output = discriminator(x_p_tilda)[0]
-            loss_discriminator_noise = bce_loss(output, zeros_label_1)
-
-            # writer.add_scalar('loss_discriminator_noise', loss_discriminator_noise, i)
-
-            gan_loss = loss_discriminator_real + loss_discriminator_rec_enc + loss_discriminator_noise
-
-            # logvar
-            x_l_tilda = discriminator(rec_enc)[1]
-            x_l = discriminator(datav)[1]
-
-            # loss_rec = ((x_l_tilda - x_l) ** 2).mean()
-            loss_mse = mse_loss(x_l_tilda, x_l)
-
-            loss_decoder = gamma * loss_mse - gan_loss
-
-            optimizer_decoder.zero_grad()
-            loss_decoder.backward(retain_graph=True)
-            optimizer_decoder.step()
-
-            writer.add_scalar('loss_decoder', loss_decoder, i)
-
             # * ----- train encoder -----
             mean, logvar, rec_enc = generator(datav)
 
@@ -188,7 +121,7 @@ if __name__ == "__main__":
             # writer.add_scalar('prior_loss', prior_loss, i)
 
             # loss_encoder = prior_loss + 5 * loss_rec
-            loss_encoder = loss_mse + kl
+            loss_encoder = loss_mse.clone() + kl.clone()
 
             optimizer_encoder.zero_grad()
             loss_encoder.backward(retain_graph=True)
@@ -196,6 +129,74 @@ if __name__ == "__main__":
 
             writer.add_scalar('loss_encoder', loss_encoder, i)
 
+            # * ----- train decoder -----
+            mean, logvar, rec_enc = generator(datav) # todo
+
+            # real data, to 1.
+            output = discriminator(datav)[0]
+            x_l = discriminator(datav)[1] #todo
+
+            loss_discriminator_real = bce_loss(output, ones_label)
+
+            # encoder decoder data, to 0
+            output = discriminator(rec_enc)[0]
+            x_l_tilda = discriminator(rec_enc)[1] # todo
+
+            loss_discriminator_rec_enc = bce_loss(output, zeros_label)
+
+            # from random noise 
+            z_p = tensor2var(torch.randn(batch_size, 128))
+            x_p_tilda = generator.decoder(z_p)
+
+            # from random noise, to 0
+            output = discriminator(x_p_tilda)[0]
+            loss_discriminator_noise = bce_loss(output, zeros_label_1)
+
+            gan_loss = loss_discriminator_real + loss_discriminator_rec_enc + loss_discriminator_noise
+
+            # logvar
+            # x_l_tilda = discriminator(rec_enc)[1]
+            # x_l = discriminator(datav)[1]
+
+            # loss_rec = ((x_l_tilda - x_l) ** 2).mean()
+            loss_mse = mse_loss(x_l_tilda, x_l)
+
+            loss_decoder = gamma * loss_mse.clone() - gan_loss.clone()
+
+            optimizer_decoder.zero_grad()
+            loss_decoder.backward(retain_graph=True)
+            optimizer_decoder.step()
+
+            writer.add_scalar('loss_decoder', loss_decoder, i)
+
+            # * ----- train discriminator -----
+            mean, logvar, rec_enc = generator(datav) # todo
+            # from random noise 
+            z_p = tensor2var(torch.randn(batch_size, 128))
+            x_p_tilda = generator.decoder(z_p)
+
+            # real data, to 1
+            output = discriminator(datav)[0]
+            loss_discriminator_real = bce_loss(output, ones_label)
+
+            # encoder data, to 0
+            output = discriminator(rec_enc)[0]
+            loss_discriminator_rec_enc = bce_loss(output, zeros_label)
+
+            # from random noise, to 0
+            output = discriminator(x_p_tilda)[0]
+            loss_discriminator_noise = bce_loss(output, zeros_label_1)
+
+            # gan loss, like paper
+            gan_loss = loss_discriminator_real.clone() + loss_discriminator_rec_enc.clone() + loss_discriminator_noise.clone()
+
+            optimizer_discriminator.zero_grad()
+            gan_loss.backward(retain_graph = True)
+            optimizer_discriminator.step()
+
+            writer.add_scalar('gan_loss', gan_loss, i)
+
+            
             print('total epoch: [%02d] step: [%02d] | encoder loss: %.5f | decoder loss: %.5f | discriminator loss: %.5f' % (i, j, loss_encoder, loss_decoder, gan_loss))
 
         # lr衰减，先不用
