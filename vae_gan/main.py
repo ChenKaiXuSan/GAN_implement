@@ -209,22 +209,25 @@ if __name__ == "__main__":
 
             datav = tensor2var(x)
 
+            # save path 
+            path = os.path.join(args.sample_path, args.version)
+            
             # save real image
             out = (datav + 1) / 2
-            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), './images' + args.version +'/real_image/original%s.png' % (i), nrow=8)
+            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), path +'/real_image/original%s.png' % (i), nrow=8)
 
             # save x_fixed image, from encoder > decoder
             out = generator(datav)[2] # out = x_tilde
             out = out.detach()
             out = (out + 1) / 2
-            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), './images' + args.version + '/recon_image/reconstructed%s.png' % (i), nrow=8)
+            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), path + '/recon_image/reconstructed%s.png' % (i), nrow=8)
 
             # save z_fixed image, from noise z > decoer
             z_fixed = tensor2var(torch.randn((args.batch_size, args.z_size)))
             out = generator.decoder(z_fixed) # out = x_p
             out = out.detach()
             out = (out + 1) / 2
-            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), './images' + args.version + '/generate_image/generated%s.png' % (i), nrow=8)
+            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), path + '/generate_image/generated%s.png' % (i), nrow=8)
 
             break
 
