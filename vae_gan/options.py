@@ -1,5 +1,4 @@
 import argparse
-from ast import parse
 import torch
 
 parser = argparse.ArgumentParser()

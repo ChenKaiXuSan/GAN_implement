@@ -11,6 +11,7 @@ from torch.autograd import Variable
 import numpy as np
 
 from options import args
+
 # %%
 class EncoderBlock(nn.Module):
     '''
@@ -39,7 +40,7 @@ class DecoderBlock(nn.Module):
     def __init__(self, channel_in, channel_out):
         super(DecoderBlock, self).__init__()
         # transpose convolution to double the dimensions
-        self.conv = nn.ConvTranspose2d(channel_in, channel_out, kernel_size=5, padding=2, stride=2)
+        self.conv = nn.ConvTranspose2d(channel_in, channel_out, kernel_size=6, padding=2, stride=2)
         self.bn = nn.BatchNorm2d(channel_out, momentum=0.9)
         self.relu = nn.LeakyReLU(0.2)
 
