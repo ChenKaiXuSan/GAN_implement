@@ -35,7 +35,7 @@ torch.manual_seed(manualSeed)
 
 # %%
 # delete the exists path
-# del_folder(args.sample_path, args.version)
+del_folder(args.sample_path, args.version)
 # del_folder('runs', '')
 
 # create dir if not exist
