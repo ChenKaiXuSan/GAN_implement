@@ -14,7 +14,8 @@ np.random.seed(8)
 torch.manual_seed(8)
 torch.cuda.manual_seed(8)
 
-from models.vae_gan import Discriminator, Encoder, VaeGan
+from models.vae_gan_1 import Discriminator, VaeGan
+# from models.vae_gan import Discriminator, Encoder, VaeGan
 from dataset.dataset import get_Dataset
 from utils.utils import *
 
@@ -36,7 +37,7 @@ torch.manual_seed(manualSeed)
 # %%
 # delete the exists path
 del_folder(args.sample_path, args.version)
-# del_folder('runs', '')
+del_folder('runs', '')
 
 # create dir if not exist
 make_folder(args.sample_path, args.version)
@@ -55,8 +56,6 @@ generator = VaeGan(z_size=args.z_size, channels_in=args.channels).cuda()
 discriminator = Discriminator(channel_in=args.channels).cuda()
 
 print(generator)
-# print(generator.decoder)
-print(discriminator)
 
 # %%
 # ------------ margin and equilibirum ------------
