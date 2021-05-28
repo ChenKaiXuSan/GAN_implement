@@ -25,7 +25,7 @@ import torchvision.utils as vutils
 from torchvision.utils import save_image
 
 from options import args
-os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
+os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1"#args.gpu
 
 # %%
 # set random seed for reproducibility
@@ -52,8 +52,16 @@ test_loader = get_Dataset(args, train=False)
 # %%
 # ------------ network ------------
 
-generator = VaeGan(z_size=args.z_size, channels_in=args.channels).cuda()
-discriminator = Discriminator(channel_in=args.channels).cuda()
+generator = VaeGan(z_size=args.z_size, channels_in=args.channels)
+discriminator = Discriminator(channel_in=args.channels)
+
+if torch.cuda.device_count() > 1:
+    print("Let's use", torch.cuda.device_count(), "gpus")
+    generator = nn.DataParallel(generator, device_ids=[0, 1]).cuda()
+    discriminator = nn.DataParallel(discriminator, device_ids=[0, 1]).cuda()
+else:
+    generator.cuda()
+    discriminator.cuda()
 
 print(generator)
 
@@ -66,6 +74,11 @@ gamma = 15
 # %%
 # --------------------- optimizers --------------------
 # an optimizer for each of the sub-networks, so we can selectively backprop
+
+if isinstance(generator, torch.nn.DataParallel):
+    generator = generator.module
+if isinstance(discriminator, torch.nn.DataParallel):
+    discriminator = discriminator.module
 
 optimizer_encoder = RMSprop(params=generator.encoder.parameters(), lr=args.lr, alpha=0.9, eps=1e-8, weight_decay=0, momentum=0, centered=False)
 lr_encoder = ExponentialLR(optimizer=optimizer_encoder, gamma=args.decay_lr)
