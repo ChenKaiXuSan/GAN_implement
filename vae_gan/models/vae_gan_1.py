@@ -146,17 +146,20 @@ class Discriminator(nn.Module):
 
         self.size = channel_in
 
-        self.conv = nn.ModuleList()
-        self.conv.append(nn.Sequential(
+        layers_list = []
+        layers_list.append(nn.Sequential(
             nn.Conv2d(in_channels=self.size, out_channels=32, kernel_size=5, stride=1, padding=2),
-            nn.LeakyReLU(negative_slope=0.2)
+            nn.LeakyReLU(negative_slope=0.2),
         ))
         self.size = 32
-        self.conv.append(EncoderBlock(channel_in=self.size, channel_out=128))
+
+        layers_list.append(EncoderBlock(channel_in=self.size, channel_out=128))
         self.size = 128
-        self.conv.append(EncoderBlock(channel_in=self.size, channel_out=256))
+        layers_list.append(EncoderBlock(channel_in=self.size, channel_out=256))
         self.size = 256
-        self.conv.append(EncoderBlock(channel_in=self.size, channel_out=256))
+        layers_list.append(EncoderBlock(channel_in=self.size, channel_out=256))
+
+        self.conv = nn.Sequential(*layers_list)
 
         # final fc to get the score (real or fake)
         self.fc = nn.Sequential(
@@ -173,8 +176,7 @@ class Discriminator(nn.Module):
     def forward(self, ten):
         batch_size = ten.size()[0]
 
-        for i, lay in enumerate(self.conv):
-            ten = lay(ten)
+        ten = self.conv(ten)
 
         ten = ten.view(batch_size, -1)
         ten1 = ten;
