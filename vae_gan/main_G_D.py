@@ -25,7 +25,7 @@ import torchvision.utils as vutils
 from torchvision.utils import save_image
 
 from options import args
-os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1"#args.gpu
+os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
 # %%
 # set random seed for reproducibility
