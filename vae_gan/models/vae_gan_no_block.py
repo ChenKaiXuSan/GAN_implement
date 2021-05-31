@@ -10,7 +10,7 @@ class Encoder(nn.Module):
     def __init__(self, channels_in, z_size) -> None:
         super(Encoder, self).__init__()
 
-        self.conv1 = nn.Conv2d(args.channels, 64, kernel_size=5, padding=2, stride=1)
+        self.conv1 = nn.Conv2d(args.channels, 64, kernel_size=5, padding=2, stride=2)
         self.bn1 = nn.BatchNorm2d(64, momentum=0.9)
         self.conv2 = nn.Conv2d(64, 128, kernel_size=5, padding=2, stride=2)
         self.bn2 = nn.BatchNorm2d(128, momentum=0.9)
