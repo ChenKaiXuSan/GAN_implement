@@ -77,3 +77,7 @@ def tensor2var(x, grad=False):
         x = x.cuda()
         x.requires_grad_(grad)
     return x
+
+def denorm(x):
+    out = (x + 1) / 2
+    return out.clamp_(0, 1)

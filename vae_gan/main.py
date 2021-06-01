@@ -37,7 +37,7 @@ torch.manual_seed(manualSeed)
 # %%
 # delete the exists path
 del_folder(args.sample_path, args.version)
-# del_folder('runs', '')
+del_folder('runs', '')
 
 # create dir if not exist
 make_folder(args.sample_path, args.version)
@@ -75,7 +75,7 @@ lr_encoder = ExponentialLR(optimizer=optimizer_encoder, gamma=args.decay_lr)
 optimizer_decoder = RMSprop(params=generator.decoder.parameters(), lr=args.lr, alpha=0.9, eps=1e-8, weight_decay=0, momentum=0, centered=False)
 lr_decoder = ExponentialLR(optimizer=optimizer_decoder, gamma=args.decay_lr)
 
-optimizer_discriminator = RMSprop(params=discriminator.parameters(), lr=args.lr, alpha=0.9, eps=1e-8, weight_decay=0, momentum=0, centered=False)
+optimizer_discriminator = RMSprop(params=discriminator.parameters(), lr=args.lr * 0.1, alpha=0.9, eps=1e-8, weight_decay=0, momentum=0, centered=False)
 lr_discriminator = ExponentialLR(optimizer=optimizer_discriminator, gamma=args.decay_lr)
 
 # %%
@@ -186,12 +186,12 @@ if __name__ == "__main__":
             # prior_loss = 1 + logvar - mean.pow(2) - logvar.exp()
             # prior_loss = (-0.5 * torch.sum(prior_loss)) / torch.numel(mean.data) # kl
 
-            kl = -0.5 * torch.sum(-logvar.exp() - torch.pow(mean, 2) + logvar + 1) / torch.numel(mean.data)
+            kl = (-0.5 * torch.sum(-logvar.exp() - torch.pow(mean, 2) + logvar + 1)) / torch.numel(mean.data)
 
             # writer.add_scalar('prior_loss', prior_loss, i)
 
             # loss_encoder = prior_loss + 5 * loss_rec
-            loss_encoder = loss_mse + kl
+            loss_encoder = 5 * loss_mse + kl
 
             optimizer_encoder.zero_grad()
             loss_encoder.backward(retain_graph=True)
@@ -205,7 +205,30 @@ if __name__ == "__main__":
         # lr_encoder.step()
         # lr_decoder.step()
         # lr_discriminator.step()
+
+        # save sample, use train image
+        if (i + 1) % 100 == 0:
+            generator.eval()
+            discriminator.eval()
+
+            datav = tensor2var(img)
+
+            path = os.path.join(args.sample_path, 'sample')
+
+            # save real image 
+            save_image(denorm(datav.data), path +'/real_image/original%s.png' % (i), padding=5, normalize=True)
+
+            # save x_fixed image
+            out = generator(datav)[2]
+            # out = denorm(out.detach())
+            save_image(denorm(out.data), path + '/recon_image/reconstructed%s.png' % (i), nrow=8, normalize=True)
         
+            # save z_fixed image
+            z_fixed = tensor2var(torch.randn((args.batch_size, args.z_size)))
+            out = generator.decoder(z_fixed)
+            # out = denorm(out.detach())
+            save_image(denorm(out.data), path + '/generate_image/generated%s.png' % (i), nrow=8, normalize=True)
+
         # save results
         for j, (x, label) in enumerate(test_loader):
             generator.eval()
@@ -217,21 +240,18 @@ if __name__ == "__main__":
             path = os.path.join(args.sample_path, args.version)
             
             # save real image
-            out = (datav + 1) / 2
-            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), path +'/real_image/original%s.png' % (i), nrow=8)
+            save_image(denorm(datav.data), path +'/real_image/original%s.png' % (i), padding=5, normalize=True)
 
             # save x_fixed image, from encoder > decoder
             out = generator(datav)[2] # out = x_tilde
             out = out.detach()
-            out = (out + 1) / 2
-            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), path + '/recon_image/reconstructed%s.png' % (i), nrow=8)
-
+            save_image(denorm(out.data), path + '/recon_image/reconstructed%s.png' % (i), nrow=8, normalize=True)
+        
             # save z_fixed image, from noise z > decoer
             z_fixed = tensor2var(torch.randn((args.batch_size, args.z_size)))
             out = generator.decoder(z_fixed) # out = x_p
             out = out.detach()
-            out = (out + 1) / 2
-            save_image(vutils.make_grid(out[:64], padding=5, normalize=True).cpu(), path + '/generate_image/generated%s.png' % (i), nrow=8)
+            save_image(denorm(out.data), path + '/generate_image/generated%s.png' % (i), nrow=8, normalize=True)
 
             break
 

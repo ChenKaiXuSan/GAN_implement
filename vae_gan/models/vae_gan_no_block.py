@@ -53,7 +53,7 @@ class Decoder(nn.Module):
         self.bn2 = nn.BatchNorm2d(256, momentum=0.9)
         self.deconv2 = nn.ConvTranspose2d(256, 128, kernel_size=6, stride=2, padding=2)
         self.bn3 = nn.BatchNorm2d(128, momentum=0.9)
-        self.deconv3 = nn.ConvTranspose2d(128, 32, kernel_size=5, stride=2, padding=2)
+        self.deconv3 = nn.ConvTranspose2d(128, 32, kernel_size=6, stride=2, padding=2)
         self.bn4 = nn.BatchNorm2d(32, momentum=0.9)
         self.deconv4 = nn.ConvTranspose2d(32, args.channels, kernel_size=5, stride=1, padding=2)
         self.tanh = nn.Tanh()
