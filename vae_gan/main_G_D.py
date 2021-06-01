@@ -106,6 +106,8 @@ if __name__ == "__main__":
         print('Epoch: %s' % (i))
         for j, (img, label) in enumerate (train_loader):
             generator.train()
+            discriminator.train()
+
             batch_size = img.size()[0]
 
             ones_label = tensor2var(torch.ones(batch_size, 1))
@@ -220,6 +222,7 @@ if __name__ == "__main__":
         # save results
         for j, (x, label) in enumerate(test_loader):
             generator.eval()
+            discriminator.eval()
 
             datav = tensor2var(x)
 

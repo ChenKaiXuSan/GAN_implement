@@ -14,7 +14,8 @@ np.random.seed(8)
 torch.manual_seed(8)
 torch.cuda.manual_seed(8)
 
-from models.vae_gan import Discriminator, Encoder, VaeGan
+from models.vae_gan_no_block import Discriminator, VaeGan
+# from models.vae_gan import Discriminator, Encoder, VaeGan
 from dataset.dataset import get_Dataset
 from utils.utils import *
 
@@ -96,6 +97,8 @@ if __name__ == "__main__":
         print('Epoch: %s' % (i))
         for j, (img, label) in enumerate (train_loader):
             generator.train()
+            discriminator.train()
+
             batch_size = img.size()[0]
 
             ones_label = tensor2var(torch.ones(batch_size, 1))
@@ -206,6 +209,7 @@ if __name__ == "__main__":
         # save results
         for j, (x, label) in enumerate(test_loader):
             generator.eval()
+            discriminator.eval()
 
             datav = tensor2var(x)
 
