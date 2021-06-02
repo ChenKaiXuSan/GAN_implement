@@ -37,10 +37,12 @@ torch.manual_seed(manualSeed)
 # %%
 # delete the exists path
 del_folder(args.sample_path, args.version)
+del_folder(args.sample_path, 'sample')
 del_folder('runs', '')
 
 # create dir if not exist
 make_folder(args.sample_path, args.version)
+make_folder(args.sample_path, 'sample')
 
 # ----------- tensorboard ------------
 writer = build_tensorboard()
@@ -207,7 +209,7 @@ if __name__ == "__main__":
         # lr_discriminator.step()
 
         # save sample, use train image
-        if (i + 1) % 100 == 0:
+        if (i + 1) % 5 == 0:
             generator.eval()
             discriminator.eval()
 
@@ -216,10 +218,11 @@ if __name__ == "__main__":
             path = os.path.join(args.sample_path, 'sample')
 
             # save real image 
-            save_image(denorm(datav.data), path +'/real_image/original%s.png' % (i), padding=5, normalize=True)
+            save_image(denorm(datav.data), path +'/real_image/original%s.png' % (i), nrow=8, normalize=True)
 
             # save x_fixed image
-            out = generator(datav)[2]
+            x_fixed = tensor2var(real_batch[0])
+            out = generator(x_fixed)[2]
             # out = denorm(out.detach())
             save_image(denorm(out.data), path + '/recon_image/reconstructed%s.png' % (i), nrow=8, normalize=True)
         
@@ -240,18 +243,19 @@ if __name__ == "__main__":
             path = os.path.join(args.sample_path, args.version)
             
             # save real image
-            save_image(denorm(datav.data), path +'/real_image/original%s.png' % (i), padding=5, normalize=True)
+            save_image(denorm(datav[:64].data), path +'/real_image/original%s.png' % (i), nrow= 8, normalize=True)
 
             # save x_fixed image, from encoder > decoder
-            out = generator(datav)[2] # out = x_tilde
+            x_fixed = tensor2var(real_batch[0])
+            out = generator(x_fixed)[2] # out = x_tilde
             out = out.detach()
-            save_image(denorm(out.data), path + '/recon_image/reconstructed%s.png' % (i), nrow=8, normalize=True)
+            save_image(denorm(out[:64].data), path + '/recon_image/reconstructed%s.png' % (i), nrow=8, normalize=True)
         
             # save z_fixed image, from noise z > decoer
             z_fixed = tensor2var(torch.randn((args.batch_size, args.z_size)))
             out = generator.decoder(z_fixed) # out = x_p
             out = out.detach()
-            save_image(denorm(out.data), path + '/generate_image/generated%s.png' % (i), nrow=8, normalize=True)
+            save_image(denorm(out[:64].data), path + '/generate_image/generated%s.png' % (i), nrow=8, normalize=True)
 
             break
 
