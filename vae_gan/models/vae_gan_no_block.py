@@ -50,12 +50,13 @@ class Decoder(nn.Module):
 
         self.relu = nn.LeakyReLU(0.2)
 
-        self.deconv1 = nn.ConvTranspose2d(256, 256, kernel_size=6, stride=2, padding=2)
+        self.deconv1 = SpectralNorm(nn.ConvTranspose2d(256, 256, kernel_size=6, stride=2, padding=2))
         self.bn2 = nn.BatchNorm2d(256, momentum=0.9)
-        self.deconv2 = nn.ConvTranspose2d(256, 128, kernel_size=6, stride=2, padding=2)
+        self.deconv2 = SpectralNorm(nn.ConvTranspose2d(256, 128, kernel_size=6, stride=2, padding=2))
         self.bn3 = nn.BatchNorm2d(128, momentum=0.9)
-        self.deconv3 = nn.ConvTranspose2d(128, 32, kernel_size=6, stride=2, padding=2)
+        self.deconv3 = SpectralNorm(nn.ConvTranspose2d(128, 32, kernel_size=6, stride=2, padding=2))
         self.bn4 = nn.BatchNorm2d(32, momentum=0.9)
+
         self.deconv4 = nn.ConvTranspose2d(32, args.channels, kernel_size=5, stride=1, padding=2)
         self.tanh = nn.Tanh()
 
@@ -79,14 +80,17 @@ class Discriminator(nn.Module):
     def __init__(self, channel_in) -> torch.Tensor:
         super(Discriminator, self).__init__()
         
-        self.conv1 = nn.Conv2d(args.channels, 32, kernel_size=5, padding=2, stride=1)
+        self.fc = nn.Linear(128, 64 * 64 * channel_in)
+        self.bn = nn.BatchNorm1d(64 * 64 * channel_in, momentum=0.9)
+
+        self.conv1 = SpectralNorm(nn.Conv2d(args.channels, 32, kernel_size=5, padding=2, stride=1))
         self.relu = nn.LeakyReLU(0.2)
 
-        self.conv2 = nn.Conv2d(32, 128, kernel_size=5, padding=2, stride=2)
+        self.conv2 = SpectralNorm(nn.Conv2d(32, 128, kernel_size=5, padding=2, stride=2))
         self.bn1 = nn.BatchNorm2d(128, momentum=0.9)
-        self.conv3 = nn.Conv2d(128, 256, kernel_size=5, padding=2, stride=2)
+        self.conv3 = SpectralNorm(nn.Conv2d(128, 256, kernel_size=5, padding=2, stride=2))
         self.bn2 = nn.BatchNorm2d(256, momentum=0.9)
-        self.conv4 = nn.Conv2d(256, 256, kernel_size=5, padding=2, stride=2)
+        self.conv4 = SpectralNorm(nn.Conv2d(256, 256, kernel_size=5, padding=2, stride=2))
         self.bn3 = nn.BatchNorm2d(256, momentum=0.9)
 
         self.fc1 = nn.Linear(8 * 8 * 256, 512)
@@ -99,6 +103,9 @@ class Discriminator(nn.Module):
 
     def forward(self, x) -> torch.Tensor:
         batch_size = x.size()[0]
+
+        x = self.relu(self.bn(self.fc(x)))
+        x = x.view(batch_size, -1, 64, 64)
 
         x = self.relu(self.conv1(x))
         x = self.relu(self.bn1(self.conv2(x)))
@@ -123,9 +130,9 @@ class VaeGan(nn.Module):
         self.decoder = Decoder(z_size=z_size, size=z_size, channel_in=channels_in)
         self.discriminator = Discriminator(channel_in=channels_in)
 
-        self.encoder.apply(weights_init)
-        self.decoder.apply(weights_init)
-        self.discriminator.apply(weights_init)
+        # self.encoder.apply(weights_init)
+        # self.decoder.apply(weights_init)
+        # self.discriminator.apply(weights_init)
 
     def forward(self, x) -> torch.Tensor:
         batch_size = x.size()[0]
