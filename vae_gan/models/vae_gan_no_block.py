@@ -5,6 +5,7 @@ from torch.autograd import Variable
 from options import args
 
 from utils.utils import tensor2var, weights_init
+from models.spectral import Self_Attn, SpectralNorm
 
 class Encoder(nn.Module):
     def __init__(self, channels_in, z_size) -> None:
@@ -58,6 +59,8 @@ class Decoder(nn.Module):
         self.deconv4 = nn.ConvTranspose2d(32, args.channels, kernel_size=5, stride=1, padding=2)
         self.tanh = nn.Tanh()
 
+        self.attn1 = Self_Attn(32, 'relu')
+
     def forward(self, x) -> torch.Tensor:
         batch_size = x.size()[0]
         x = self.relu(self.bn1(self.fc1(x)))
@@ -65,7 +68,10 @@ class Decoder(nn.Module):
         x = self.relu(self.bn2(self.deconv1(x)))
         x = self.relu(self.bn3(self.deconv2(x)))
         x = self.relu(self.bn4(self.deconv3(x)))
-        x = self.tanh(self.deconv4(x))
+
+        out, p = self.attn1(x)
+
+        x = self.tanh(self.deconv4(out))
 
         return x
 
