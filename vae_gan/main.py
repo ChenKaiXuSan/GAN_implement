@@ -218,19 +218,19 @@ if __name__ == "__main__":
             path = os.path.join(args.sample_path, 'sample')
 
             # save real image 
-            save_image(denorm(datav.data), path +'/real_image/original%s.png' % (i), nrow=8, normalize=True)
+            save_image(denorm(datav[:64].data), path +'/real_image/original%s.png' % (i), nrow=8, normalize=True)
 
             # save x_fixed image
             x_fixed = tensor2var(real_batch[0])
             out = generator(x_fixed)[2]
             # out = denorm(out.detach())
-            save_image(denorm(out.data), path + '/recon_image/reconstructed%s.png' % (i), nrow=8, normalize=True)
+            save_image(denorm(out[:64].data), path + '/recon_image/reconstructed%s.png' % (i), nrow=8, normalize=True)
         
             # save z_fixed image
             z_fixed = tensor2var(torch.randn((args.batch_size, args.z_size)))
             out = generator.decoder(z_fixed)
             # out = denorm(out.detach())
-            save_image(denorm(out.data), path + '/generate_image/generated%s.png' % (i), nrow=8, normalize=True)
+            save_image(denorm(out[:64].data), path + '/generate_image/generated%s.png' % (i), nrow=8, normalize=True)
 
         # save results
         for j, (x, label) in enumerate(test_loader):

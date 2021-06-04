@@ -71,7 +71,7 @@ class Decoder(nn.Module):
 
 class Discriminator(nn.Module):
     def __init__(self, channel_in) -> torch.Tensor:
-        super().__init__()
+        super(Discriminator, self).__init__()
         
         self.conv1 = nn.Conv2d(args.channels, 32, kernel_size=5, padding=2, stride=1)
         self.relu = nn.LeakyReLU(0.2)
