@@ -105,7 +105,7 @@ if __name__ == "__main__":
 
             ones_label = tensor2var(torch.ones(batch_size, 1))
             zeros_label = tensor2var(torch.zeros(batch_size, 1))
-            zeros_label_1 = tensor2var(torch.zeros(batch_size, 1))
+            # zeros_label_1 = tensor2var(torch.zeros(batch_size, 1))
 
             datav = tensor2var(img)
 
@@ -126,7 +126,7 @@ if __name__ == "__main__":
 
             # from random noise, to 0
             output = discriminator(x_p_tilda)[0]
-            loss_discriminator_noise = bce_loss(output, zeros_label_1)
+            loss_discriminator_noise = bce_loss(output, zeros_label)
 
             # gan loss, like paper
             gan_loss = loss_discriminator_real + loss_discriminator_rec_enc + loss_discriminator_noise
@@ -152,7 +152,7 @@ if __name__ == "__main__":
 
             # from random noise, to 0
             output = discriminator(x_p_tilda)[0]
-            loss_discriminator_noise = bce_loss(output, zeros_label_1)
+            loss_discriminator_noise = bce_loss(output, zeros_label)
 
             # writer.add_scalar('loss_discriminator_noise', loss_discriminator_noise, i)
 
