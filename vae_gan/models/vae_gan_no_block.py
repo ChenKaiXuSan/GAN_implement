@@ -69,7 +69,7 @@ class Decoder(nn.Module):
         x = self.relu(self.bn3(self.deconv2(x)))
         x = self.relu(self.bn4(self.deconv3(x)))
 
-        out, p = self.attn1(x)
+        out, _ = self.attn1(x)
 
         x = self.tanh(self.deconv4(out))
 
@@ -91,6 +91,9 @@ class Discriminator(nn.Module):
 
         self.fc1 = nn.Linear(8 * 8 * 256, 512)
         self.bn4 = nn.BatchNorm1d(512, momentum=0.9)
+
+        self.attn1 = Self_Attn(256, 'relu')
+
         self.fc2 = nn.Linear(512, 1)
         self.sigmoid = nn.Sigmoid()
 
@@ -101,6 +104,8 @@ class Discriminator(nn.Module):
         x = self.relu(self.bn1(self.conv2(x)))
         x = self.relu(self.bn2(self.conv3(x)))
         x = self.relu(self.bn3(self.conv4(x)))
+
+        x, _ = self.attn1(x)
 
         x = x.view(-1, 256 * 8 * 8)
         x1 = x;
