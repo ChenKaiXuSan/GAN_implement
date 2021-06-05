@@ -2,6 +2,8 @@
 import os
 
 import sys
+
+from torch.nn.modules.loss import BCELoss
 sys.path.append('..')
 sys.path.append('.')
 
@@ -20,7 +22,7 @@ from dataset.dataset import get_Dataset
 from utils.utils import *
 
 from torch.optim.lr_scheduler import ExponentialLR, MultiStepLR
-from torch.optim import RMSprop, Adam, SGD
+from torch.optim import RMSprop, Adam, SGD, adam
 import torchvision.utils as vutils
 from torchvision.utils import save_image
 
@@ -71,14 +73,16 @@ gamma = 15
 # --------------------- optimizers --------------------
 # an optimizer for each of the sub-networks, so we can selectively backprop
 
-optimizer_encoder = RMSprop(params=generator.encoder.parameters(), lr=args.lr, alpha=0.9, eps=1e-8, weight_decay=0, momentum=0, centered=False)
-lr_encoder = ExponentialLR(optimizer=optimizer_encoder, gamma=args.decay_lr)
+optimizer_encoder = Adam(params=generator.encoder.parameters(), lr=args.lr)
+# lr_encoder = ExponentialLR(optimizer=optimizer_encoder, gamma=args.decay_lr)
 
-optimizer_decoder = RMSprop(params=generator.decoder.parameters(), lr=args.lr, alpha=0.9, eps=1e-8, weight_decay=0, momentum=0, centered=False)
-lr_decoder = ExponentialLR(optimizer=optimizer_decoder, gamma=args.decay_lr)
+optimizer_decoder = Adam(params=generator.decoder.parameters(), lr=args.lr)
+# lr_decoder = ExponentialLR(optimizer=optimizer_decoder, gamma=args.decay_lr)
 
-optimizer_discriminator = RMSprop(params=discriminator.parameters(), lr=args.lr * 0.1, alpha=0.9, eps=1e-8, weight_decay=0, momentum=0, centered=False)
-lr_discriminator = ExponentialLR(optimizer=optimizer_discriminator, gamma=args.decay_lr)
+
+# optimizer_discriminator = RMSprop(params=discriminator.parameters(), lr=args.lr * 0.1, alpha=0.9, eps=1e-8, weight_decay=0, momentum=0, centered=False)
+optimizer_discriminator = Adam(discriminator.parameters(), lr=args.lr)
+# lr_discriminator = ExponentialLR(optimizer=optimizer_discriminator, gamma=args.decay_lr)
 
 # %%
 real_batch = next(iter(train_loader))
@@ -103,161 +107,94 @@ if __name__ == "__main__":
 
             batch_size = img.size()[0]
 
-            ones_label = tensor2var(torch.ones(batch_size, 1))
-            zeros_label = tensor2var(torch.zeros(batch_size, 1))
-            # zeros_label_1 = tensor2var(torch.zeros(batch_size, 1))
+            real_label = tensor2var(torch.ones(batch_size, 1))
+            fake_label = tensor2var(torch.zeros(batch_size, 1))
 
             datav = tensor2var(img)
 
+            # 
+            #   D
+            #
             mean, logvar, rec_enc = generator(datav)
 
-            # from random noise 
-            z_p = tensor2var(torch.randn(batch_size, 128))
+            z_p = tensor2var(torch.randn(batch_size, z_size))
             x_p_tilda = generator.decoder(z_p)
 
-            # * ----- train discriminator -----
-            # real data, to 1
             output = discriminator(datav)[0]
-            loss_discriminator_real = bce_loss(output, ones_label)
+            errD_real = bce_loss(output, real_label)
 
-            # encoder data, to 0
             output = discriminator(rec_enc)[0]
-            loss_discriminator_rec_enc = bce_loss(output, zeros_label)
+            errD_rec_enc = bce_loss(output, fake_label)
 
-            # from random noise, to 0
             output = discriminator(x_p_tilda)[0]
-            loss_discriminator_noise = bce_loss(output, zeros_label)
+            errD_rec_noise = bce_loss(output, fake_label)
 
-            # gan loss, like paper
-            gan_loss = loss_discriminator_real + loss_discriminator_rec_enc + loss_discriminator_noise
+            gan_loss = errD_real + errD_rec_enc + errD_rec_noise
 
             optimizer_discriminator.zero_grad()
-            gan_loss.backward(retain_graph = True)
+            gan_loss.backward(retain_graph=True)
             optimizer_discriminator.step()
 
-            writer.add_scalar('gan_loss', gan_loss, i)
-
-            # * ----- train decoder -----
-            # real data, to 1.
+            #
+            #   Decoder
+            #
             output = discriminator(datav)[0]
-            loss_discriminator_real = bce_loss(output, ones_label)
-
-            # writer.add_scalar('loss_discriminator_real', loss_discriminator_real, i)
-
-            # encoder decoder data, to 0
+            errD_real = bce_loss(output, real_label)
             output = discriminator(rec_enc)[0]
-            loss_discriminator_rec_enc = bce_loss(output, zeros_label)
-
-            # writer.add_scalar('loss_discriminator_rec_enc', loss_discriminator_rec_enc, i)
-
-            # from random noise, to 0
+            errD_rec_enc = bce_loss(output, fake_label)
             output = discriminator(x_p_tilda)[0]
-            loss_discriminator_noise = bce_loss(output, zeros_label)
-
-            # writer.add_scalar('loss_discriminator_noise', loss_discriminator_noise, i)
-
-            gan_loss = loss_discriminator_real + loss_discriminator_rec_enc + loss_discriminator_noise
-
-            # logvar
+            errD_rec_noise = bce_loss(output, fake_label)
+            gan_loss = errD_real + errD_rec_enc + errD_rec_noise
+            
             x_l_tilda = discriminator(rec_enc)[1]
             x_l = discriminator(datav)[1]
-
-            # loss_rec = ((x_l_tilda - x_l) ** 2).mean()
-            loss_mse = mse_loss(x_l_tilda, x_l)
-
-            loss_decoder = gamma * loss_mse - gan_loss
+            rec_loss = ((x_l_tilda - x_l) ** 2).mean()
+            err_dec = gamma * rec_loss - gan_loss 
 
             optimizer_decoder.zero_grad()
-            loss_decoder.backward(retain_graph=True)
+            err_dec.backward(retain_graph=True)
             optimizer_decoder.step()
 
-            writer.add_scalar('loss_decoder', loss_decoder, i)
-
-            # * ----- train encoder -----
+            #
+            #   Encoder
+            #
             mean, logvar, rec_enc = generator(datav)
-
-            # logvar 
             x_l_tilda = discriminator(rec_enc)[1]
             x_l = discriminator(datav)[1]
+            rec_loss = ((x_l_tilda - x_l) ** 2).mean()
 
-            # loss_rec = ((x_l_tilda - x_l) ** 2).mean() # mse
-            loss_mse = mse_loss(x_l_tilda, x_l)
-
-            # writer.add_scalar('loss_rec', loss_rec, i)
-
-            # prior_loss = 1 + logvar - mean.pow(2) - logvar.exp()
-            # prior_loss = (-0.5 * torch.sum(prior_loss)) / torch.numel(mean.data) # kl
-
-            kl = (-0.5 * torch.sum(-logvar.exp() - torch.pow(mean, 2) + logvar + 1)) / torch.numel(mean.data)
-
-            # writer.add_scalar('prior_loss', prior_loss, i)
-
-            # loss_encoder = prior_loss + 5 * loss_rec
-            loss_encoder = 5 * loss_mse + kl
+            prior_loss = 1 + logvar - mean.pow(2) - logvar.exp()
+            prior_loss = (-0.5 * torch.sum(prior_loss))/torch.numel(mean.data)
+            
+            err_enc = prior_loss + 5*rec_loss
 
             optimizer_encoder.zero_grad()
-            loss_encoder.backward(retain_graph=True)
+            err_enc.backward(retain_graph=True)
             optimizer_encoder.step()
 
-            writer.add_scalar('loss_encoder', loss_encoder, i)
+            print('total epoch: [%02d] step: [%02d] | encoder loss: %.5f | decoder loss: %.5f | discriminator loss: %.5f' % (i, j, err_enc, err_dec, gan_loss.item()))
 
-            print('total epoch: [%02d] step: [%02d] | encoder loss: %.5f | decoder loss: %.5f | discriminator loss: %.5f' % (i, j, loss_encoder, loss_decoder, gan_loss))
+            # save sample, use train image
+            if (j + 1) % 10 == 0:
+                generator.eval()
 
-        # lr衰减，先不用
-        # lr_encoder.step()
-        # lr_decoder.step()
-        # lr_discriminator.step()
+                datav = tensor2var(img)
 
-        # save sample, use train image
-        if (i + 1) % 5 == 0:
-            generator.eval()
-            discriminator.eval()
+                path = os.path.join(args.sample_path, 'sample')
 
-            datav = tensor2var(img)
+                # save real image 
+                save_image(denorm(datav[:64].data), path +'/real_image/original%s.png' % (j), nrow=8, normalize=True)
 
-            path = os.path.join(args.sample_path, 'sample')
-
-            # save real image 
-            save_image(denorm(datav[:64].data), path +'/real_image/original%s.png' % (i), nrow=8, normalize=True)
-
-            # save x_fixed image
-            x_fixed = tensor2var(real_batch[0])
-            out = generator(x_fixed)[2]
-            # out = denorm(out.detach())
-            save_image(denorm(out[:64].data), path + '/recon_image/reconstructed%s.png' % (i), nrow=8, normalize=True)
-        
-            # save z_fixed image
-            z_fixed = tensor2var(torch.randn((args.batch_size, args.z_size)))
-            out = generator.decoder(z_fixed)
-            # out = denorm(out.detach())
-            save_image(denorm(out[:64].data), path + '/generate_image/generated%s.png' % (i), nrow=8, normalize=True)
-
-        # save results
-        for j, (x, label) in enumerate(test_loader):
-            generator.eval()
-            discriminator.eval()
-
-            datav = tensor2var(x)
-
-            # save path 
-            path = os.path.join(args.sample_path, args.version)
+                # save x_fixed image
+                x_fixed = tensor2var(real_batch[0])
+                out = generator(x_fixed)[2]
+                save_image(denorm(out[:64].data), path + '/recon_image/reconstructed%s.png' % (j), nrow=8, normalize=True)
             
-            # save real image
-            save_image(denorm(datav[:64].data), path +'/real_image/original%s.png' % (i), nrow= 8, normalize=True)
+                # save z_fixed image
+                z_fixed = tensor2var(torch.randn((args.batch_size, args.z_size)))
+                out = generator.decoder(z_fixed)
+                save_image(denorm(out[:64].data), path + '/generate_image/generated%s.png' % (j), nrow=8, normalize=True)
 
-            # save x_fixed image, from encoder > decoder
-            x_fixed = tensor2var(real_batch[0])
-            out = generator(x_fixed)[2] # out = x_tilde
-            out = out.detach()
-            save_image(denorm(out[:64].data), path + '/recon_image/reconstructed%s.png' % (i), nrow=8, normalize=True)
-        
-            # save z_fixed image, from noise z > decoer
-            z_fixed = tensor2var(torch.randn((args.batch_size, args.z_size)))
-            out = generator.decoder(z_fixed) # out = x_p
-            out = out.detach()
-            save_image(denorm(out[:64].data), path + '/generate_image/generated%s.png' % (i), nrow=8, normalize=True)
-
-            break
 
     exit(0)
 

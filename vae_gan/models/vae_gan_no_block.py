@@ -50,11 +50,11 @@ class Decoder(nn.Module):
 
         self.relu = nn.LeakyReLU(0.2)
 
-        self.deconv1 = SpectralNorm(nn.ConvTranspose2d(256, 256, kernel_size=6, stride=2, padding=2))
-        self.bn2 = nn.BatchNorm2d(256, momentum=0.9)
-        self.deconv2 = SpectralNorm(nn.ConvTranspose2d(256, 128, kernel_size=6, stride=2, padding=2))
-        self.bn3 = nn.BatchNorm2d(128, momentum=0.9)
-        self.deconv3 = SpectralNorm(nn.ConvTranspose2d(128, 32, kernel_size=6, stride=2, padding=2))
+        self.deconv1 = SpectralNorm(nn.ConvTranspose2d(256, 128, kernel_size=6, stride=2, padding=2))
+        self.bn2 = nn.BatchNorm2d(128, momentum=0.9)
+        self.deconv2 = SpectralNorm(nn.ConvTranspose2d(128, 64, kernel_size=6, stride=2, padding=2))
+        self.bn3 = nn.BatchNorm2d(64, momentum=0.9)
+        self.deconv3 = SpectralNorm(nn.ConvTranspose2d(64, 32, kernel_size=6, stride=2, padding=2))
         self.bn4 = nn.BatchNorm2d(32, momentum=0.9)
 
         self.deconv4 = nn.ConvTranspose2d(32, args.channels, kernel_size=5, stride=1, padding=2)
@@ -70,9 +70,9 @@ class Decoder(nn.Module):
         x = self.relu(self.bn3(self.deconv2(x)))
         x = self.relu(self.bn4(self.deconv3(x)))
 
-        out, _ = self.attn1(x)
+        x, _ = self.attn1(x)
 
-        x = self.tanh(self.deconv4(out))
+        x = self.tanh(self.deconv4(x))
 
         return x
 
@@ -90,22 +90,22 @@ class Discriminator(nn.Module):
         self.bn1 = nn.BatchNorm2d(128, momentum=0.9)
         self.conv3 = SpectralNorm(nn.Conv2d(128, 256, kernel_size=5, padding=2, stride=2))
         self.bn2 = nn.BatchNorm2d(256, momentum=0.9)
-        self.conv4 = SpectralNorm(nn.Conv2d(256, 256, kernel_size=5, padding=2, stride=2))
-        self.bn3 = nn.BatchNorm2d(256, momentum=0.9)
+        self.conv4 = SpectralNorm(nn.Conv2d(256, 512, kernel_size=5, padding=2, stride=2))
+        self.bn3 = nn.BatchNorm2d(512, momentum=0.9)
 
-        self.fc1 = nn.Linear(8 * 8 * 256, 512)
-        self.bn4 = nn.BatchNorm1d(512, momentum=0.9)
+        self.fc1 = nn.Linear(8 * 8 * 512, 1024)
+        self.bn4 = nn.BatchNorm1d(1024, momentum=0.9)
 
-        self.attn1 = Self_Attn(256, 'relu')
+        self.attn1 = Self_Attn(512, 'relu')
 
-        self.fc2 = nn.Linear(512, 1)
+        self.fc2 = nn.Linear(1024, 1)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x) -> torch.Tensor:
         batch_size = x.size()[0]
 
-        x = self.relu(self.bn(self.fc(x)))
-        x = x.view(batch_size, -1, 64, 64)
+        # x = self.relu(self.bn(self.fc(x)))
+        # x = x.view(batch_size, -1, 64, 64)
 
         x = self.relu(self.conv1(x))
         x = self.relu(self.bn1(self.conv2(x)))
@@ -114,7 +114,7 @@ class Discriminator(nn.Module):
 
         x, _ = self.attn1(x)
 
-        x = x.view(-1, 256 * 8 * 8)
+        x = x.view(-1, 512 * 8 * 8)
         x1 = x;
 
         x = self.relu(self.bn4(self.fc1(x)))
