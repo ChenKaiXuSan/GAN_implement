@@ -4,16 +4,6 @@ import torch
 parser = argparse.ArgumentParser()
 parser.add_argument('--batch_size', type=int, default=64, help='input batch size for training')
 parser.add_argument('--input_size', default=[3, 64, 64])
-parser.add_argument('--beta1', default=0.5, help='Beta1 hyperparam for Adam optimizers')
-
-parser.add_argument('--train_img_dir', type=str, default='../dataset/celeba/train')
-parser.add_argument('--train_attr_path', type=str, default='../dataset/celeba/list_attr_celeba_train.txt')
-parser.add_argument('--test_img_dir', type=str, default='../dataset/celeba/test')
-parser.add_argument('--test_attr_path', type=str, default='../dataset/celeba/list_attr_celeba_test.txt')
-parser.add_argument('--selected_attrs', '--list', nargs='+', help='selected attributes for the CelebA dataset',
-                        default=['Bald', 'Bangs', 'Black_Hair', 'Blond_Hair', 'Brown_Hair', 'Bushy_Eyebrows', 'Eyeglasses', 'Gray_Hair', 'Heavy_Makeup', 'Male', 'Mouth_Slightly_Open', 'Mustache', 'Pale_Skin', 'Receding_Hairline', 'Smiling', 'Straight_Hair', 'Wavy_Hair', 'Wearing_Hat'])
-parser.add_argument('--celeba_crop_size', type=int, default=178, help='crop size for the CelebA dataset')
-parser.add_argument('--mode', type=str, default='train', choices=['train', 'test'])
 
 parser.add_argument('--no-cuda', action='store_true', default=False, help='enables CUDA training')
 parser.add_argument('--num_workers', type=int, default=16)
@@ -43,7 +33,7 @@ parser.add_argument("--dataset", type=str, choices=['mnist', 'fashion', 'cifar10
 parser.add_argument('--w_kld', type=float, default=1)
 parser.add_argument('--w_loss_g', type=float, default=0.01)
 parser.add_argument('--w_loss_gd', type=float, default=1)
-parser.add_argument('--gpu', type=str, default='0')
+parser.add_argument('--gpu', type=str, default='1')
 
 # Path
 parser.add_argument('--dataroot', type=str, default='../data', help='path to dataset')
