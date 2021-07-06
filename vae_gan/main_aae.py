@@ -16,8 +16,9 @@ np.random.seed(8)
 torch.manual_seed(8)
 torch.cuda.manual_seed(8)
 
-from models.vae_gan_no_block import Discriminator, Encoder, Decoder
+# from models.vae_gan_no_block import Discriminator, Encoder, Decoder
 # from models.vae_gan import Discriminator, Encoder, VaeGan
+from models.aae import Discriminator, Encoder, Decoder
 from dataset.dataset import get_Dataset
 from utils.utils import *
 
@@ -57,9 +58,9 @@ test_loader = get_Dataset(args, train=False)
 # ------------ network ------------
 
 # generator = VaeGan(z_size=args.z_size, channels_in=args.channels).cuda()
-encoder = Encoder(channels_in=args.channels, z_size=args.z_size).cuda()
-decoder = Decoder(z_size=args.z_size, size=args.z_size, channel_in=args.channels).cuda()
-discriminator = Discriminator(channel_in=args.channels).cuda()
+encoder = Encoder().cuda()
+decoder = Decoder().cuda()
+discriminator = Discriminator().cuda()
 
 # print(generator)
 # print(generator.decoder)
