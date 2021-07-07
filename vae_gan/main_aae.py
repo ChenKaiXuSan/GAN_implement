@@ -4,6 +4,8 @@ import os
 
 import sys
 
+from torch.nn.modules.loss import BCELoss
+
 sys.path.append('..')
 sys.path.append('.')
 
@@ -41,14 +43,14 @@ torch.manual_seed(manualSeed)
 # delete the exists path
 del_folder(args.sample_path, args.version)
 del_folder(args.sample_path, 'sample')
-del_folder('runs', '')
+# del_folder('runs', '')
 
 # create dir if not exist
 make_folder(args.sample_path, args.version)
 make_folder(args.sample_path, 'sample')
 
 # ----------- tensorboard ------------
-writer = build_tensorboard()
+# writer = build_tensorboard()
 
 # ------------ dataloader ------------
 train_loader = get_Dataset(args, train=True)
@@ -114,38 +116,33 @@ if __name__ == "__main__":
             datav = tensor2var(img)
 
             # train generator
-            z_mean, z_logvar = encoder(datav)
-
-            std = z_logvar.mul(0.5).exp_()
-            epsilon = tensor2var(torch.randn(batch_size, 128))
-            z = z_mean + std * epsilon
-            
-            decoded_imgs = decoder(z)
-
-            g_loss = 0.001 * bce_loss(discriminator(z)[0], ones_label) + 0.999 * pixelwise_loss(decoded_imgs, datav)
-
             optimizer_generator.zero_grad()
+
+            encoded_imgs = encoder(datav)
+            decoded_imgs = decoder(encoded_imgs)
+
+            # Loss 
+            g_loss = 0.001 * bce_loss(discriminator(encoded_imgs), ones_label) + \
+                    0.999 * pixelwise_loss(decoded_imgs, datav)
+
             g_loss.backward()
             optimizer_generator.step()
 
-            writer.add_scalar('g_loss', g_loss, i)
-
             # train discriminator 
-            # from random noise 
-            z_p = tensor2var(torch.randn(batch_size, 128))
+            optimizer_discriminator.zero_grad()
 
-            real_loss = bce_loss(discriminator(z_p)[0], ones_label)
-            fake_loss = bce_loss(discriminator(z.detach())[0], zeros_label)
+            # sample noise as discriminator ground truth 
+            z_p = tensor2var(torch.randn(img.shape[0], args.latent_dim))
 
+            # Measure discriminator's ability to classify real from generated samples 
+            real_loss = bce_loss(discriminator(z_p), ones_label)
+            fake_loss = bce_loss(discriminator(encoded_imgs.detach()), zeros_label)
             d_loss = 0.5 * (real_loss + fake_loss)
 
-            optimizer_discriminator.zero_grad()
             d_loss.backward()
             optimizer_discriminator.step()
 
-            writer.add_scalar('loss_decoder', d_loss, i)
-
-            print('total epoch: [%02d] step: [%02d] | encoder_decoder loss: %.5f | discriminator loss: %.5f' % (i, j, g_loss, d_loss))
+            print('total epoch: [%02d] step: [%02d] | encoder_decoder loss: %.5f | discriminator loss: %.5f' % (i, j, g_loss.item(), d_loss.item()))
 
         # save sample, use train image
             if (j + 1) % 100 == 0:
@@ -163,15 +160,16 @@ if __name__ == "__main__":
                 # std = z_logvar.mul(0.5).exp_()
                 # epsilon = tensor2var(torch.randn(batch_size, 128))
                 # z = z_mean + std * epsilon
+                z = tensor2var(torch.randn(100, args.latent_dim))
                 with torch.no_grad():
                     out = decoder(z)
                 save_image(denorm(out.data.cpu()), path + '/recon_image/reconstructed%s.png' % (j), nrow=8, normalize=True)
             
-                # save z_fixed image
-                z_fixed = tensor2var(torch.randn((8, args.z_size)))
-                with torch.no_grad():
-                    out = decoder(z_fixed)
-                save_image(denorm(out.data.cpu()), path + '/generate_image/generated%s.png' % (j), nrow=8, normalize=True)
+                # # save z_fixed image
+                # z_fixed = tensor2var(torch.randn((8, args.z_size)))
+                # with torch.no_grad():
+                #     out = decoder(z_fixed)
+                # save_image(denorm(out.data.cpu()), path + '/generate_image/generated%s.png' % (j), nrow=8, normalize=True)
 
     exit(0)
 

@@ -24,24 +24,34 @@ class Encoder(nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
 
-        self.model = nn.Sequential(
-            nn.Linear(int(np.prod(img_shape)), 512),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(512, 512),
-            nn.BatchNorm1d(512),
-            nn.LeakyReLU(0.2, inplace=True),
-        )
+        self.conv1 = nn.Conv2d(args.channels, 64, kernel_size=5, padding=2, stride=2)
+        self.bn1 = nn.BatchNorm2d(64, momentum=0.9)
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=5, padding=2, stride=2)
+        self.bn2 = nn.BatchNorm2d(128, momentum=0.9)
+        self.conv3 = nn.Conv2d(128, 256, kernel_size=5, padding=2, stride=2)
+        self.bn3 = nn.BatchNorm2d(256, momentum=0.9)
 
-        self.mu = nn.Linear(512, args.latent_dim)
-        self.logvar = nn.Linear(512, args.latent_dim)
+        self.relu = nn.LeakyReLU(0.2)
+
+        self.fc1 = nn.Linear(256 * 8 * 8, 2048)
+        self.bn4 = nn.BatchNorm1d(2048, momentum=0.9)
+
+        self.fc_mean = nn.Linear(2048, 128)
+        self.fc_logvar = nn.Linear(2048, 128)
 
     def forward(self, img):
-        img_flat = img.view(img.shape[0], -1)
-        x = self.model(img_flat)
+        batch_size = int(img.size()[0])
+        out = self.relu(self.bn1(self.conv1(img)))
+        out = self.relu(self.bn2(self.conv2(out)))
+        out = self.relu(self.bn3(self.conv3(out)))
 
-        mu = self.mu(x)
-        logvar = self.logvar(x)
-        z = reparameterization(mu, logvar)
+        out_flat = out.view(batch_size, -1)
+
+        out = self.relu(self.bn4(self.fc1(out_flat)))
+
+        mean = self.fc_mean(out)
+        logvar = self.fc_logvar(out)
+        z = reparameterization(mean, logvar)
         return z
 
 # %%

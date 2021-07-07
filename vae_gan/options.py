@@ -2,7 +2,7 @@ import argparse
 import torch
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--batch_size', type=int, default=64, help='input batch size for training')
+parser.add_argument('--batch_size', type=int, default=128, help='input batch size for training')
 parser.add_argument('--input_size', default=[3, 64, 64])
 
 parser.add_argument('--no-cuda', action='store_true', default=False, help='enables CUDA training')
@@ -18,18 +18,18 @@ parser.add_argument("--decay_mse",default=1,action="store",type=float,dest="deca
 parser.add_argument("--decay_margin",default=1,action="store",type=float,dest="decay_margin")
 parser.add_argument("--decay_equilibrium",default=1,action="store",type=float,dest="decay_equilibrium")
 
-parser.add_argument("--n_epochs", type=int, default=30, help="number of epochs of training")
+parser.add_argument("--n_epochs", type=int, default=50, help="number of epochs of training")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
-parser.add_argument("--latent_dim", type=int, default=100, help="dimensionality of the latent space")
+parser.add_argument("--latent_dim", type=int, default=128, help="dimensionality of the latent space")
 parser.add_argument("--img_size", type=int, default=64, help="size of each image dimension")
 parser.add_argument("--channels", type=int, default=1, help="number of image channels")
 parser.add_argument("--n_critic", type=int, default=5, help="number of training steps for discriminator per iter")
 parser.add_argument("--clip_value", type=float, default=0.01, help="lower and upper clip value for disc. weights")
 parser.add_argument("--sample_interval", type=int, default=400, help="interval betwen image samples")
 parser.add_argument("--dataset", type=str, choices=['mnist', 'fashion', 'cifar10'],
-                    default='fashion', help="dataset to use")
+                    default='mnist', help="dataset to use")
 parser.add_argument('--w_kld', type=float, default=1)
 parser.add_argument('--w_loss_g', type=float, default=0.01)
 parser.add_argument('--w_loss_gd', type=float, default=1)
@@ -38,7 +38,7 @@ parser.add_argument('--gpu', type=str, default='1')
 # Path
 parser.add_argument('--dataroot', type=str, default='../data', help='path to dataset')
 parser.add_argument('--log_path', type=str, default='./logs')
-parser.add_argument('--sample_path', type=str, default='./images')
+parser.add_argument('--sample_path', type=str, default='./images_local')
 
 parser.add_argument('--version', type=str, default='mnist_')
 
@@ -46,7 +46,7 @@ parser.add_argument('--real_image', type=str, default='real_image')
 parser.add_argument('--generate_image', type=str, default='generate_image')
 parser.add_argument('--recon_image', type=str, default='recon_image')
 
-args = parser.parse_args()
+args = parser.parse_args([])
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
 print(args)
