@@ -5,6 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: 当前文件",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "Python: aae",
             "type": "python",
             "request": "launch",
@@ -16,7 +23,7 @@
                 "--channels",
                 "3",
                 "--batch_size",
-                "8",
+                "128",
                 "--img_size",
                 "64"
             ]
