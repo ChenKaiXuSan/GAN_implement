@@ -26,30 +26,44 @@ class Encoder(nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
 
-        self.conv1 = nn.Conv2d(args.channels, 64, kernel_size=5, padding=2, stride=2)
+        self.conv1 = nn.Conv2d(args.channels, 64, kernel_size=3, stride=2, padding=1)
         self.bn1 = nn.BatchNorm2d(64, momentum=0.9)
-        self.conv2 = nn.Conv2d(64, 128, kernel_size=5, padding=2, stride=2)
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1)
         self.bn2 = nn.BatchNorm2d(128, momentum=0.9)
-        self.conv3 = nn.Conv2d(128, 256, kernel_size=5, padding=2, stride=2)
+        self.conv3 = nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1)
         self.bn3 = nn.BatchNorm2d(256, momentum=0.9)
+        self.conv4 = nn.Conv2d(256, 512, kernel_size=3, stride=2, padding=1)
+        self.bn4 = nn.BatchNorm2d(512, momentum=0.9) # 512, 4, 4
+        self.conv5 = nn.Conv2d(512, 1024, kernel_size=3, stride=2, padding=1)
+        self.bn5 = nn.BatchNorm2d(1024, momentum=0.9) # 1024, 2, 2
 
         self.relu = nn.LeakyReLU(0.2)
 
-        self.fc1 = nn.Linear(256 * 8 * 8, 2048)
-        self.bn4 = nn.BatchNorm1d(2048, momentum=0.9)
-
-        self.fc_mean = nn.Linear(2048, 128)
-        self.fc_logvar = nn.Linear(2048, 128)
+        self.fc1 = nn.Linear(1024 * 2 * 2, 1024 * 2)
+        self.bn_fc = nn.BatchNorm1d(1024 * 2, momentum=0.9)
+        self.fc2 = nn.Linear(2048, 1024)
+        self.bn_fc1 = nn.BatchNorm1d(1024, momentum=0.9)
+        self.fc3 = nn.Linear(1024, 512)
+        self.bn_fc2= nn.BatchNorm1d(512, momentum=0.9)
+        
+        self.fc_mean = nn.Linear(512, 128)
+        self.fc_logvar = nn.Linear(512, 128)
 
     def forward(self, img):
         batch_size = int(img.size()[0])
         out = self.relu(self.bn1(self.conv1(img)))
         out = self.relu(self.bn2(self.conv2(out)))
         out = self.relu(self.bn3(self.conv3(out)))
+        out = self.relu(self.bn4(self.conv4(out)))
+        out = self.relu(self.bn5(self.conv5(out))) # 1024, 2, 2
 
         out_flat = out.view(batch_size, -1)
 
-        out = self.relu(self.bn4(self.fc1(out_flat)))
+        out = self.relu(self.bn_fc(self.fc1(out_flat)))
+        out = self.relu(self.bn_fc1(self.fc2(out)))
+        out = self.relu(self.bn_fc2(self.fc3(out))) # 512
+
+
 
         mean = self.fc_mean(out)
         logvar = self.fc_logvar(out)
@@ -66,11 +80,11 @@ class Decoder(nn.Module):
 
         self.relu = nn.LeakyReLU(0.2)
 
-        self.deconv1 = nn.ConvTranspose2d(256, 128, kernel_size=6, stride=2, padding=2)
+        self.deconv1 = nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1)
         self.bn2 = nn.BatchNorm2d(128, momentum=0.9)
-        self.deconv2 = nn.ConvTranspose2d(128, 64, kernel_size=6, stride=2, padding=2)
+        self.deconv2 = nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1)
         self.bn3 = nn.BatchNorm2d(64, momentum=0.9)
-        self.deconv3 = nn.ConvTranspose2d(64, 32, kernel_size=6, stride=2, padding=2)
+        self.deconv3 = nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1)
         self.bn4 = nn.BatchNorm2d(32, momentum=0.9)
 
         self.deconv4 = nn.ConvTranspose2d(32, args.channels, kernel_size=5, stride=1, padding=2)

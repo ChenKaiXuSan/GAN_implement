@@ -39,6 +39,7 @@ print("Random Seed: ", manualSeed)
 random.seed(manualSeed)
 torch.manual_seed(manualSeed)
 
+cuda = True if torch.cuda.is_available() else False
 # %%
 # delete the exists path
 del_folder(args.sample_path, args.version)
@@ -67,10 +68,10 @@ def weights_init_normal(m):
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
         torch.nn.init.constant_(m.bias.data, 0.0)
         
-# generator = VaeGan(z_size=args.z_size, channels_in=args.channels).cuda()
-encoder = Encoder().cuda()
-decoder = Decoder().cuda()
-discriminator = Discriminator().cuda()
+if cuda:
+    encoder = Encoder().cuda()
+    decoder = Decoder().cuda()
+    discriminator = Discriminator().cuda()
 
 # Initialize weights
 encoder.apply(weights_init)
@@ -157,27 +158,29 @@ if __name__ == "__main__":
 
         # save sample, use train image
         if (i + 1) % 5 == 0:
-            decoder.eval()
-            encoder.eval()
+            for j, (img, label) in enumerate(train_loader):
+                decoder.eval()
+                encoder.eval()
 
-            path = os.path.join(args.sample_path, args.version)
+                path = os.path.join(args.sample_path, args.version)
 
-            # save real image 
-            save_image(denorm(datav.data.cpu()), path +'/real_image/original%s.png' % (i), nrow=8, normalize=True)
+                # save real image 
+                save_image(denorm(img[:64]), path +'/real_image/original%s.png' % (i), nrow=8, normalize=True)
 
-            # save x_fixed image
-            x_fixed = tensor2var(img)
-            encoder_imgs = encoder(x_fixed)
+                # save x_fixed image
+                x_fixed = tensor2var(img)
+                encoder_imgs = encoder(x_fixed)
 
-            with torch.no_grad():
-                out = decoder(encoder_imgs)
-            save_image(denorm(out.data.cpu()), path + '/recon_image/reconstructed%s.png' % (i), nrow=8, normalize=True)
-        
-            # save z_fixed image
-            z_fixed = tensor2var(torch.randn((datav.size()[0], args.z_size)))
-            with torch.no_grad():
-                out = decoder(z_fixed)
-            save_image(denorm(out.data.cpu()), path + '/generate_image/generated%s.png' % (i), nrow=8, normalize=True)
+                with torch.no_grad():
+                    out = decoder(encoder_imgs)
+                save_image(denorm(out.data[:64].cpu()), path + '/recon_image/reconstructed%s.png' % (i), nrow=8, normalize=True)
+            
+                # save z_fixed image
+                Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
+                z_fixed = tensor2var(Tensor(torch.randn((img.size(0), args.latent_dim))))
+                with torch.no_grad():
+                    out = decoder(z_fixed)
+                save_image(denorm(out.data[:64].cpu()), path + '/generate_image/generated%s.png' % (i), nrow=8, normalize=True)
 
     exit(0)
 

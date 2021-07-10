@@ -19,9 +19,9 @@
             "console": "integratedTerminal",
             "args": [
                 "--dataset",
-                "cifar10",
+                "mnist",
                 "--channels",
-                "3",
+                "1",
                 "--batch_size",
                 "128",
                 "--img_size",
