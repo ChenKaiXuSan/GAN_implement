@@ -70,7 +70,7 @@ class Decoder(nn.Module):
         x = self.relu(self.bn3(self.deconv2(x)))
         x = self.relu(self.bn4(self.deconv3(x)))
 
-        x, _ = self.attn1(x)
+        # x, _ = self.attn1(x)
 
         x = self.tanh(self.deconv4(x))
 
@@ -112,7 +112,7 @@ class Discriminator(nn.Module):
         x = self.relu(self.bn2(self.conv3(x)))
         x = self.relu(self.bn3(self.conv4(x)))
 
-        x, _ = self.attn1(x)
+        # x, _ = self.attn1(x)
 
         x = x.view(-1, 512 * 8 * 8)
         x1 = x;
