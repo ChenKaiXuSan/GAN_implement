@@ -117,8 +117,8 @@ if __name__ == "__main__":
             batch_size = img.size()[0]
 
             # adversarial ground truths
-            ones_label = tensor2var(torch.ones(batch_size, 1))
-            zeros_label = tensor2var(torch.zeros(batch_size, 1))
+            ones_label = tensor2var(torch.ones(batch_size, 1), grad=False)
+            zeros_label = tensor2var(torch.zeros(batch_size, 1), grad=False)
 
             # configure input 
             datav = tensor2var(img)
@@ -131,7 +131,6 @@ if __name__ == "__main__":
             encoded_imgs = encoder(datav) # 128, 128
             decoded_imgs= decoder(encoded_imgs, gen_labels) # 128, 1, 64, 64
 
-            # gen_imgs = decoder(z, gen_labels)
             # train generator
 
             optimizer_generator.zero_grad()
@@ -139,12 +138,12 @@ if __name__ == "__main__":
             validity, pred_label = discriminator(decoded_imgs.detach())
             
             # Loss 
-            g_loss = 0.001 * bce_loss(discriminator(encoded_imgs)[0], ones_label) + \
-                    0.999 * pixelwise_loss(decoded_imgs, datav) + \
-                    auxiliary_loss(pred_label, gen_labels) + \
-                    bce_loss(validity, ones_label)
+            aae_loss = 0.001 * bce_loss(discriminator(encoded_imgs)[0], ones_label) + \
+                    0.999 * pixelwise_loss(decoded_imgs, datav)
 
-            g_loss = g_loss * 0.5
+            acgan_loss = 0.5 * (bce_loss(validity, ones_label) + auxiliary_loss(pred_label, gen_labels))
+
+            g_loss = 0.5 * (aae_loss + acgan_loss)
 
             g_loss.backward()
             optimizer_generator.step()
@@ -155,7 +154,7 @@ if __name__ == "__main__":
             optimizer_discriminator.zero_grad()
 
             # sample noise as discriminator ground truth 
-            x_p = tensor2var(torch.randn(img.shape[0], args.latent_dim))
+            z_p = tensor2var(torch.randn(img.shape[0], args.latent_dim))
 
             # Measure discriminator's ability to classify real from generated samples 
             # loss for real image 
@@ -166,10 +165,14 @@ if __name__ == "__main__":
             fake_pred, fake_aux = discriminator(decoded_imgs.detach())
             d_fake_loss = bce_loss(fake_pred, zeros_label) + auxiliary_loss(fake_aux, gen_labels)
 
-            real_loss = bce_loss(discriminator(x_p)[0], ones_label)
+
+            real_loss = bce_loss(discriminator(z_p)[0], ones_label)
             fake_loss = bce_loss(discriminator(encoded_imgs.detach())[0], zeros_label)
 
-            d_loss = 0.5 * (real_loss + fake_loss + d_real_loss + d_fake_loss)
+            d_acgan_loss = 0.5 * (d_fake_loss + d_real_loss)
+            d_aae_loss = 0.5 * (real_loss + fake_loss)
+
+            d_loss = (d_acgan_loss + d_aae_loss) * 0.5
 
             # calcuate discriminator accuracy 
             pred = np.concatenate([real_aux.data.cpu().numpy(), fake_aux.data.cpu().numpy()], axis=0)
@@ -191,7 +194,7 @@ if __name__ == "__main__":
             path = os.path.join(args.sample_path, args.version)
 
             # save real image 
-            save_image(denorm(img[:64]), path +'/real_image/original%s.png' % (i), nrow=8, normalize=True)
+            save_image(denorm(img[:100]), path +'/real_image/original%s.png' % (i), nrow=10, normalize=True)
 
             # save x_fixed image
             x_fixed = tensor2var(img)
@@ -202,14 +205,14 @@ if __name__ == "__main__":
             with torch.no_grad():
                 encoder_imgs = encoder(x_fixed)
                 out = decoder(encoder_imgs, labels)
-            save_image(denorm(out[:64].data), path + '/recon_image/reconstructed%s.png' % (i), nrow=8, normalize=True)
+            save_image(denorm(out[:100].data), path + '/recon_image/reconstructed%s.png' % (i), nrow=10, normalize=True)
         
             # save z_fixed image
             z_fixed = tensor2var(torch.randn(img.size(0), args.latent_dim))
 
             with torch.no_grad():
                 out = decoder(z_fixed, labels)
-            save_image(denorm(out[:64].data), path + '/generate_image/generated%s.png' % (i), nrow=8, normalize=True)
+            save_image(denorm(out[:100].data), path + '/generate_image/generated%s.png' % (i), nrow=10, normalize=True)
 
             break;
 

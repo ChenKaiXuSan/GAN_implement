@@ -78,7 +78,11 @@ class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
 
-        self.fc = nn.Linear(64 * 64, 128)
+        self.fc = nn.Sequential(
+        nn.Linear(64 * 64, 128),
+        nn.BatchNorm1d(128),
+        nn.LeakyReLU(0.2, inplace=True),
+        )
 
         self.model = nn.Sequential(
             nn.Linear(args.latent_dim, 512),
