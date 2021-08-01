@@ -8,6 +8,7 @@ import datetime
 import torch.nn as nn 
 from torch.autograd import Variable
 from torch.utils.data import dataloader
+from torchvision import models
 from torchvision.utils import save_image
 import torch.autograd as autograd
 
@@ -19,6 +20,8 @@ sys.path.append('..')
 
 from self_attention_gan.models.sagan import Generator, Discriminator
 from self_attention_gan.utils.utils import *
+import models.FID as fid
+
 # %%
 class Trainer(object):
     def __init__(self, data_loader, config):
@@ -71,6 +74,8 @@ class Trainer(object):
         if self.use_tensorboard:
             self.build_tensorboard()
 
+        self.build_FID()
+
     def train(self):
 
         # data iterator 
@@ -96,9 +101,9 @@ class Trainer(object):
             real_images = tensor2var(real_images)
             labels = tensor2var(labels)
 
-            d_out_real, dr = self.D(real_images, labels)
+            d_out_real, real_aux= self.D(real_images, labels)
             if self.adv_loss == 'wgan-gp':
-                d_loss_real = -torch.mean(d_out_real)
+                d_loss_real = -torch.mean(d_out_real) + self.c_loss(real_aux, labels)
             elif self.adv_loss == 'hinge':
                 d_loss_real = torch.nn.ReLU()(1.0 - d_out_real).mean()
             elif self.adv_loss == 'wgan-div':
@@ -107,10 +112,10 @@ class Trainer(object):
             # apply Gumbel Softmax
             z = tensor2var(torch.randn(real_images.size(0), self.z_dim)) # 64, 100
             fake_images, gf = self.G(z, labels)
-            d_out_fake, df = self.D(fake_images, labels)
+            d_out_fake, fake_aux = self.D(fake_images, labels)
 
             if self.adv_loss == 'wgan-gp':
-                d_loss_fake = d_out_fake.mean()
+                d_loss_fake = d_out_fake.mean() + self.c_loss(fake_aux, labels)
             elif self.adv_loss == 'hinge':
                 d_loss_fake = torch.nn.ReLU()(1.0 + d_out_fake).mean()
             elif self.adv_loss == 'wgan-div':
@@ -211,12 +216,13 @@ class Trainer(object):
                 # =================== Train G and gumbel =====================
                 # create random noise 
                 z = tensor2var(torch.randn(real_images.size(0), self.z_dim))
+                gen_labels = tensor2var(torch.LongTensor(np.random.randint(0, self.n_classes, self.batch_size)))
                 fake_images, _ = self.G(z, labels)
 
                 # compute loss with fake images 
-                g_out_fake, _ = self.D(fake_images, labels) # batch x n
+                g_out_fake, pred_labels = self.D(fake_images, labels) # batch x n
                 if self.adv_loss == 'wgan-gp':
-                    g_loss_fake = -g_out_fake.mean()
+                    g_loss_fake = -g_out_fake.mean() + self.c_loss(pred_labels, labels)
                 if self.adv_loss == 'wgan-div':
                     g_loss_fake = -g_out_fake.mean()
 
@@ -226,14 +232,16 @@ class Trainer(object):
 
                 self.logger.add_scalar('g_loss_fake', g_loss_fake, step)
 
+            # calculate FID
+            # fretchet_dist = fid.calculate_fretchet(real_images, fake_images, self.fid_model)
             # print out log info
             if (step + 1) % self.log_step == 0:
                 elapsed = time.time() - start_time
                 elapsed = str(datetime.timedelta(seconds=elapsed))
-                print("Elapsed [{}], G_step [{}/{}], D_step[{}/{}], d_out_real: {:.4f}, "
-                      " ave_gamma_l3: {:.4f}, ave_gamma_l4: {:.4f}".
+                print("Elapsed [{}], G_step [{}/{}], D_step[{}/{}], d_out_real: {:.4f}, g_loss: {:.4f}, "
+                      " ave_gamma_l3: {:.4f}, ave_gamma_l4: {:.4f}, Fretchet_Distance:".
                       format(elapsed, step + 1, self.total_step, (step + 1),
-                             self.total_step , d_loss_real.item(),
+                             self.total_step , d_loss_real.item(), g_loss_fake.item(),
                              self.G.attn1.gamma.mean().item(), self.G.attn2.gamma.mean().item() ))
 
             # sample images 
@@ -279,6 +287,11 @@ class Trainer(object):
         # real_images, _ = next(data_iter)
         path = self.sample_path + '/real_images'
         save_image(denorm(real_images.data), os.path.join(path, '{}_real.png'.format(step + 1)))
+    
+    def build_FID(self):
+        block_idx = fid.InceptionV3.BLOCK_INDEX_BY_DIM[2048]
+        model = fid.InceptionV3([block_idx])
+        self.fid_model=model.cuda()
 
 # %%
 import self_attention_gan.main  as main

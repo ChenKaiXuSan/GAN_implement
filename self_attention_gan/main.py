@@ -3,7 +3,7 @@ import sys
 sys.path.append('..')
 sys.path.append('.')
 
-from self_attention_gan.trainer import Trainer
+from trainer import Trainer
 from self_attention_gan.utils.utils import *
 from self_attention_gan.dataset.dataset import getdDataset
 
@@ -17,9 +17,9 @@ def get_parameters():
 
     # Model hyper-parameters
     parser.add_argument('--model', type=str, default='sagan', choices=['sagan', 'qgan'])
-    parser.add_argument('--adv_loss', type=str, default='wgan-div', choices=['wgan-gp', 'hinge', 'wgan-div'])
+    parser.add_argument('--adv_loss', type=str, default='wgan-gp', choices=['wgan-gp', 'hinge', 'wgan-div'])
     parser.add_argument('--img_size', type=int, default=64)
-    parser.add_argument('--channels', type=int, default=1, help='number of image channels')
+    parser.add_argument('--channels', type=int, default=3, help='number of image channels')
     parser.add_argument('--g_num', type=int, default=5)
     parser.add_argument('--z_dim', type=int, default=100)
     parser.add_argument('--g_conv_dim', type=int, default=64)
@@ -45,7 +45,7 @@ def get_parameters():
     # Misc
     parser.add_argument('--train', type=str2bool, default=True)
     parser.add_argument('--parallel', type=str2bool, default=False)
-    parser.add_argument('--dataset', type=str, default='fashion', choices=['mnist', 'cifar10', 'fashion'])
+    parser.add_argument('--dataset', type=str, default='cifar10', choices=['mnist', 'cifar10', 'fashion'])
     parser.add_argument('--use_tensorboard', type=str2bool, default=True)
 
     # Path
