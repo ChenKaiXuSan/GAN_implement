@@ -9,59 +9,10 @@ sys.path.append('../..')
 sys.path.append('./')
 
 from torch.autograd import Variable
-from .spectral import SpectralNorm
 import numpy as np
 
-# %%
-
-
-class Self_Attn(nn.Module):
-    '''
-    self attention layer
-
-    Args:
-        nn (father): father class
-    '''
-
-    def __init__(self, in_dim, activation):
-        super(Self_Attn, self).__init__()
-        self.chanel_in = in_dim
-        self.activation = activation
-
-        self.query_conv = nn.Conv2d(
-            in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1)
-        self.key_conv = nn.Conv2d(
-            in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1)
-        self.value_conv = nn.Conv2d(
-            in_channels=in_dim, out_channels=in_dim, kernel_size=1)
-        self.gamma = nn.Parameter(torch.zeros(1))
-
-        self.softmax = nn.Softmax(dim=-1)
-
-    def forward(self, x):
-        '''
-        input:
-            x: input feature maps(b, x, w, h)
-
-        Returns:
-            out: self attention value + input feature
-            attention: b, n, n (n is width*height)
-        '''
-        m_batchsize, C, width, height = x.size()
-        proj_query = self.query_conv(x).view(
-            m_batchsize, -1, width*height).permute(0, 2, 1)  # b, (w*h), c
-        proj_key = self.key_conv(x).view(
-            m_batchsize, -1, width*height)  # b, c, (w*h)
-        energy = torch.bmm(proj_query, proj_key)  # transpose check
-        attention = self.softmax(energy)  # x, n, n
-        proj_value = self.value_conv(x).view(
-            m_batchsize, -1, width*height)  # b, c, n
-
-        out = torch.bmm(proj_value, attention.permute(0, 2, 1))
-        out = out.view(m_batchsize, C, width, height)
-
-        out = self.gamma * out + x
-        return out, attention
+from .spectral import SpectralNorm
+from .attention import *
 
 # %%
 def fill_labels(img_size):
@@ -100,28 +51,30 @@ class Generator(nn.Module):
 
         repeat_num = int(np.log2(self.imsize)) - 3  # 3
         mult = 2 ** repeat_num  # 8
-        layer1.append(
-            nn.ConvTranspose2d(z_dim, conv_dim * mult, 4, 1, 0, bias=False))
+        layer1.append(SpectralNorm(
+            nn.ConvTranspose2d(z_dim, conv_dim * mult, 4, 1, 0, bias=False)))
         layer1.append(nn.BatchNorm2d(conv_dim * mult))
         layer1.append(nn.ReLU())
 
         curr_dim = conv_dim * mult
 
-        layer2.append(nn.ConvTranspose2d(
-            curr_dim, int(curr_dim / 2), 4, 2, 1, bias = False))
+        layer2.append(SpectralNorm(
+            nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias = False)))
         layer2.append(nn.BatchNorm2d(int(curr_dim / 2)))
         layer2.append(nn.ReLU())
 
         curr_dim = int(curr_dim / 2)
 
-        layer3.append(nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False))
+        layer3.append(SpectralNorm(
+            nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False)))
         layer3.append(nn.BatchNorm2d(int(curr_dim / 2)))
         layer3.append(nn.ReLU())
 
         if self.imsize == 64:
             layer4 = []
             curr_dim = int(curr_dim / 2)
-            layer4.append(nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False))
+            layer4.append(SpectralNorm(
+                nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False)))
             layer4.append(nn.BatchNorm2d(int(curr_dim / 2)))
             layer4.append(nn.ReLU())
             self.l4 = nn.Sequential(*layer4)
@@ -144,15 +97,15 @@ class Generator(nn.Module):
 
         input = torch.mul(labels_emb, z)
         # input = torch.cat((labels_emb, z), 1)
+
         input = input.view(input.size(0), input.size(1), 1, 1)
         out = self.l1(input)
         out = self.l2(out)
         out = self.l3(out)
 
-        if self.imsize == 64:
-            # out, p = self.attn1(out)
-            out = self.l4(out)
-            # out, p = self.attn2(out)
+        # out, p = self.attn1(out)
+        out = self.l4(out)
+        # out, p = self.attn2(out)
 
         out = self.last(out)
 
@@ -176,24 +129,31 @@ class Discriminator(nn.Module):
         last_adv_layer = []
         last_aux_layer = []
 
-        layer1.append(nn.Conv2d(self.n_classes, conv_dim, 4, 2, 1, bias=False))
+        layer1.append(SpectralNorm(
+            nn.Conv2d(self.n_classes, conv_dim, 4, 2, 1, bias=False)))
         layer1.append(nn.LeakyReLU(0.1))
 
         curr_dim = conv_dim
 
-        layer2.append(nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False))
+        layer2.append(SpectralNorm(
+            nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False)))
+        # layer2.append(nn.BatchNorm2d(curr_dim * 2, ))
         layer2.append(nn.LeakyReLU(0.1))
 
         curr_dim = curr_dim * 2
         
-        layer3.append(nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False))
+        layer3.append(SpectralNorm(
+            nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False)))
+        # layer3.append(nn.BatchNorm2d(curr_dim * 2))
         layer3.append(nn.LeakyReLU(0.1))
         
         curr_dim = curr_dim * 2
 
         if self.imsize == 64:
             layer4 = []
-            layer4.append(nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False))
+            layer4.append(SpectralNorm(
+                nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False)))
+            # layer4.append(nn.BatchNorm2d(curr_dim * 2))
             layer4.append(nn.LeakyReLU(0.1))
             self.l4 = nn.Sequential(*layer4)
             curr_dim = curr_dim * 2
@@ -216,14 +176,14 @@ class Discriminator(nn.Module):
         labels_fill = fill_labels(self.imsize)[labels] # 10, 10, img_size, img_size torch.cuda.floattensor
         # input = torch.cat((x, labels_fill), 1) # torch.cuda.floattensor
         input = torch.mul(x, labels_fill)
+
         out = self.l1(input)
         out = self.l2(out)
         out = self.l3(out)
         # out, p = self.attn1(out)
 
-        if self.imsize == 64:
-            out = self.l4(out)
-            # out, p = self.attn2(out)
+        out = self.l4(out)
+        # out, p = self.attn2(out)
 
         valiidity = self.last_adv(out)
         label = self.last_aux(out)

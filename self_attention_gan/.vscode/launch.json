@@ -17,6 +17,8 @@
                 "1",
                 "--sample_path",
                 "test_sample",
+                "--version",
+                "debug",
             ]
         }
     ]

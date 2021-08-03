@@ -2,6 +2,7 @@
 import os 
 import torch
 from torch.autograd import Variable
+import torch.nn as nn
 
 import shutil
 
@@ -82,3 +83,12 @@ def to_LongTensor(labels):
 def to_Tensor(x, *arg):
     Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.LongTensor
     return Tensor(x, *arg)
+
+# custom weights initialization called on netG and netD
+def weights_init(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv') != -1:
+        nn.init.normal_(m.weight.data, 0.0, 0.02)
+    elif classname.find('BatchNorm') != -1:
+        nn.init.normal_(m.weight.data, 1.0, 0.02)
+        nn.init.constant_(m.bias.data, 0)
