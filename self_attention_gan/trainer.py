@@ -53,6 +53,7 @@ class Trainer(object):
         self.beta2 = config.beta2
         self.pretrained_model = config.pretrained_model
         self.n_classes = config.n_classes
+        self.lambda_aux = config.lambda_aux
 
         self.dataset = config.dataset 
         self.use_tensorboard = config.use_tensorboard
@@ -103,7 +104,7 @@ class Trainer(object):
             d_out_real, real_aux= self.D(real_images, labels)
 
             if self.adv_loss == 'wgan-gp':
-                d_loss_real = -torch.mean(d_out_real) + 0.1 * self.c_loss(real_aux, labels)
+                d_loss_real = -torch.mean(d_out_real) + self.lambda_aux * self.c_loss(real_aux, labels)
             elif self.adv_loss == 'hinge':
                 d_loss_real = torch.nn.ReLU()(1.0 - d_out_real).mean()
             elif self.adv_loss == 'wgan-div':
@@ -117,7 +118,7 @@ class Trainer(object):
             self.save_image_tensorboard(fake_images, 'D/fake_images', step)
 
             if self.adv_loss == 'wgan-gp':
-                d_loss_fake = d_out_fake.mean() + 0.1 * self.c_loss(fake_aux, labels)
+                d_loss_fake = d_out_fake.mean() + self.lambda_aux * self.c_loss(fake_aux, labels)
             elif self.adv_loss == 'hinge':
                 d_loss_fake = torch.nn.ReLU()(1.0 + d_out_fake).mean()
             elif self.adv_loss == 'wgan-div':
@@ -227,7 +228,7 @@ class Trainer(object):
                 # compute loss with fake images 
                 g_out_fake, pred_labels = self.D(fake_images, labels) # batch x n
                 if self.adv_loss == 'wgan-gp':
-                    g_loss_fake = -g_out_fake.mean() + 0.1 * self.c_loss(pred_labels, labels)
+                    g_loss_fake = -g_out_fake.mean() + self.lambda_aux * self.c_loss(pred_labels, labels)
                 if self.adv_loss == 'wgan-div':
                     g_loss_fake = -g_out_fake.mean()
 
@@ -261,7 +262,7 @@ class Trainer(object):
                 with torch.no_grad():
                     labels = to_LongTensor(labels)
                     fake_images, _= self.G(fixed_z, labels)
-                    self.save_image_tensorboard(fake_images, 'G/from_noise', step)
+                    self.save_image_tensorboard(fake_images, 'G/from_noise', step+1)
                 save_image(denorm(fake_images.data),
                             os.path.join(self.sample_path, '{}_fake.png'.format(step + 1)), nrow=self.n_classes, normalize=True)
 
@@ -285,8 +286,9 @@ class Trainer(object):
         data_iter = iter(self.data_loader)
         real_images, labels = next(data_iter)
 
-        # self.logger.add_graph(self.D, (real_images.cuda(), labels.cuda()))
-
+        self.logger.add_graph(self.D, (real_images.cuda(), labels.cuda()))
+        self.logger.close()
+        
         # print networks
         print(self.G)
         print(self.D)
@@ -311,7 +313,7 @@ class Trainer(object):
 
     def save_image_tensorboard(self, images, text, step):
         if step % 100 == 0:
-            img_grid = torchvision.utils.make_grid(images)
+            img_grid = torchvision.utils.make_grid(images, nrow=8)
 
             self.logger.add_image(text + str(step), img_grid, step)
             self.logger.close()

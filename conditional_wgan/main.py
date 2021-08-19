@@ -14,7 +14,7 @@ import torch.autograd as autograd
 
 import random
 import torchvision.transforms as transform
-from torchvision.utils import save_image
+from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader, dataloader
 from torchvision import datasets
 
@@ -33,7 +33,6 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import shutil
 # shutil.rmtree('runs/')
-writer = SummaryWriter('runs/c_wgan')
 # %%
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=150, help="number of epochs of training")
@@ -43,19 +42,20 @@ parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first 
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
 parser.add_argument("--latent_dim", type=int, default=100, help="dimensionality of the latent space")
-parser.add_argument("--img_size", type=int, default=32, help="size of each image dimension")
+parser.add_argument("--img_size", type=int, default=64, help="size of each image dimension")
 parser.add_argument("--channels", type=int, default=1, help="number of image channels")
 parser.add_argument("--n_critic", type=int, default=5, help="number of training steps for discriminator per iter")
 parser.add_argument("--clip_value", type=float, default=0.01, help="lower and upper clip value for disc. weights")
 parser.add_argument("--sample_interval", type=int, default=400, help="interval betwen image samples")
 parser.add_argument("--dcgan", action='store_false', help='use MLP')
 parser.add_argument("--dataset", type=str, choices=['mnist', 'fashion', 'cifar10'],
-                    default='cifar10', help="dataset to use")
+                    default='mnist', help="dataset to use")
 parser.add_argument("--dataroot", type=str, default='../data/', help='path to dataset')
 
 opt = parser.parse_args()
 print(opt)
 # %%
+writer = SummaryWriter('runs/'+ opt.dataset)
 opt.img_shape = (opt.channels, opt.img_size, opt.img_size)
 
 opt.manualSeed = random.randint(1, 10000) # fix seed 
@@ -115,6 +115,7 @@ def sample_image(n_row, batches_done):
     with torch.no_grad():
         labels = LongTensor(labels)
         gen_imgs = generator(z, labels)
+        writer.add_image('fake_iamge_%d' % batches_done, make_grid(gen_imgs.data, nrow=n_row, normalize=True), batches_done)
     save_image(gen_imgs.data, 'images/c_wgan/%d.png' % batches_done, nrow=n_row, normalize=True)
 
 # %%
@@ -227,6 +228,7 @@ for epoch in range(opt.n_epochs):
             if batches_done % opt.sample_interval == 0:
                 # save real img
                 save_image(real_imgs.data, 'images/c_wgan/real_image/real_image_%d.png'% batches_done, nrow=int(opt.batch_size ** 0.5), normalize=True)
+                writer.add_image('real_image', make_grid(real_imgs.data, nrow=8, normalize=True))
                 sample_image(opt.n_classes, batches_done)
 
             batches_done += opt.n_critic

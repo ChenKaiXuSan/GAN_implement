@@ -53,31 +53,38 @@ class Generator(nn.Module):
         mult = 2 ** repeat_num  # 8
         layer1.append(SpectralNorm(
             nn.ConvTranspose2d(z_dim, conv_dim * mult, 4, 1, 0, bias=False)))
-        layer1.append(nn.BatchNorm2d(conv_dim * mult))
+        # layer1.append(nn.BatchNorm2d(conv_dim * mult))
         layer1.append(nn.ReLU())
+
+        self.attn1 = Self_Attn(conv_dim * mult, 'relu')
 
         curr_dim = conv_dim * mult
 
         layer2.append(SpectralNorm(
             nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias = False)))
-        layer2.append(nn.BatchNorm2d(int(curr_dim / 2)))
+        # layer2.append(nn.BatchNorm2d(int(curr_dim / 2)))
         layer2.append(nn.ReLU())
 
+        self.attn2 = Self_Attn(int(curr_dim / 2), 'relu')
         curr_dim = int(curr_dim / 2)
 
         layer3.append(SpectralNorm(
             nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False)))
-        layer3.append(nn.BatchNorm2d(int(curr_dim / 2)))
+        # layer3.append(nn.BatchNorm2d(int(curr_dim / 2)))
         layer3.append(nn.ReLU())
+
+        self.attn3 = Self_Attn(int(curr_dim / 2), 'relu')
 
         if self.imsize == 64:
             layer4 = []
             curr_dim = int(curr_dim / 2)
             layer4.append(SpectralNorm(
                 nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False)))
-            layer4.append(nn.BatchNorm2d(int(curr_dim / 2)))
+            # layer4.append(nn.BatchNorm2d(int(curr_dim / 2)))
             layer4.append(nn.ReLU())
             self.l4 = nn.Sequential(*layer4)
+            self.attn4 = Self_Attn(int(curr_dim / 2), 'relu')
+
         curr_dim = int(curr_dim / 2)
 
         self.l1 = nn.Sequential(*layer1)
@@ -88,8 +95,8 @@ class Generator(nn.Module):
         last.append(nn.Tanh())
         self.last = nn.Sequential(*last)
 
-        self.attn1 = Self_Attn(128, 'relu')
-        self.attn2 = Self_Attn(64, 'relu')
+        # self.attn1 = Self_Attn(128, 'relu')
+        # self.attn2 = Self_Attn(64, 'relu')
 
     def forward(self, z, labels):
 
@@ -100,16 +107,18 @@ class Generator(nn.Module):
 
         input = input.view(input.size(0), input.size(1), 1, 1)
         out = self.l1(input)
+        out, p = self.attn1(out)
         out = self.l2(out)
+        out, p = self.attn2(out)
         out = self.l3(out)
+        out, p = self.attn3(out)
 
-        # out, p = self.attn1(out)
         out = self.l4(out)
-        # out, p = self.attn2(out)
+        out, p = self.attn4(out)
 
         out = self.last(out)
 
-        return out, out
+        return out, p
 
 
 # %%
@@ -130,8 +139,10 @@ class Discriminator(nn.Module):
         last_aux_layer = []
 
         layer1.append(SpectralNorm(
-            nn.Conv2d(self.n_classes, conv_dim, 4, 2, 1, bias=False)))
+            nn.Conv2d(self.n_classes + self.channels, conv_dim, 4, 2, 1, bias=False)))
         layer1.append(nn.LeakyReLU(0.1))
+
+        self.attn1 = Self_Attn(conv_dim, 'relu')
 
         curr_dim = conv_dim
 
@@ -140,6 +151,8 @@ class Discriminator(nn.Module):
         # layer2.append(nn.BatchNorm2d(curr_dim * 2, ))
         layer2.append(nn.LeakyReLU(0.1))
 
+        self.attn2 = Self_Attn(curr_dim * 2, 'relu')
+
         curr_dim = curr_dim * 2
         
         layer3.append(SpectralNorm(
@@ -147,6 +160,8 @@ class Discriminator(nn.Module):
         # layer3.append(nn.BatchNorm2d(curr_dim * 2))
         layer3.append(nn.LeakyReLU(0.1))
         
+        self.attn3 = Self_Attn(curr_dim * 2, 'relu')
+
         curr_dim = curr_dim * 2
 
         if self.imsize == 64:
@@ -156,6 +171,7 @@ class Discriminator(nn.Module):
             # layer4.append(nn.BatchNorm2d(curr_dim * 2))
             layer4.append(nn.LeakyReLU(0.1))
             self.l4 = nn.Sequential(*layer4)
+            self.attn4 = Self_Attn(curr_dim * 2, 'relu')
             curr_dim = curr_dim * 2
         
         self.l1 = nn.Sequential(*layer1)
@@ -164,26 +180,30 @@ class Discriminator(nn.Module):
 
         # output layers
         last_adv_layer.append(nn.Conv2d(curr_dim, 1, 4, 1, 0, bias=False))
+
         last_aux_layer.append(nn.Conv2d(curr_dim, self.n_classes, 4, 1, 0, bias=False))
+        last_aux_layer.append(nn.Softmax())
 
         self.last_adv = nn.Sequential(*last_adv_layer)
         self.last_aux = nn.Sequential(*last_aux_layer)
 
-        self.attn1 = Self_Attn(256, 'relu')
-        self.attn2 = Self_Attn(512, 'relu')
+        # self.attn1 = Self_Attn(256, 'relu')
+        # self.attn2 = Self_Attn(512, 'relu')
 
     def forward(self, x, labels):
         labels_fill = fill_labels(self.imsize)[labels] # 10, 10, img_size, img_size torch.cuda.floattensor
-        # input = torch.cat((x, labels_fill), 1) # torch.cuda.floattensor
-        input = torch.mul(x, labels_fill)
+        input = torch.cat((x, labels_fill), 1) # torch.cuda.floattensor
+        # input = torch.mul(x, labels_fill)
 
         out = self.l1(input)
+        out, p = self.attn1(out)
         out = self.l2(out)
+        out, p = self.attn2(out)
         out = self.l3(out)
-        # out, p = self.attn1(out)
+        out, p = self.attn3(out)
 
         out = self.l4(out)
-        # out, p = self.attn2(out)
+        out, p = self.attn4(out)
 
         valiidity = self.last_adv(out)
         label = self.last_aux(out)
@@ -210,5 +230,3 @@ if __name__ == '__main__':
 
     x, att1, att2 = genertor(z, label)
     print(x.shape, att1.shape, att2.shape)
-
-# %%

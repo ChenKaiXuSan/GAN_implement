@@ -12,9 +12,9 @@
             "console": "integratedTerminal",
             "args": [
                 "--dataset",
-                "mnist",
+                "cifar10",
                 "--channels",
-                "1",
+                "3",
                 "--sample_path",
                 "test_sample",
                 "--version",

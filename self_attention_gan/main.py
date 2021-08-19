@@ -1,5 +1,6 @@
 # %%
 import sys
+
 sys.path.append('..')
 sys.path.append('.')
 
@@ -26,6 +27,7 @@ def get_parameters():
     parser.add_argument('--d_conv_dim', type=int, default=64)
     parser.add_argument('--lambda_gp', type=float, default=10)
     parser.add_argument('--version', type=str, default='sagan_1')
+    parser.add_argument('--lambda_aux', type=int, default=0.3, help='aux loss number')
 
     # Training setting
     parser.add_argument('--total_step', type=int, default=10000, help='how many times to update the generator')
