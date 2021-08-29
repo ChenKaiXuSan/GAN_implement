@@ -3,6 +3,7 @@ import os
 import time
 import torch
 import datetime
+from torch._C import device
 
 import torch.nn as nn 
 from torch.autograd import Variable
@@ -12,7 +13,7 @@ import torch.autograd as autograd
 
 import numpy as np
 
-from models.sagan import Generator, Discriminator
+from models.bigGAN import Generator, Discriminator
 from utils.utils import *
 import models.FID as fid
 
@@ -30,14 +31,15 @@ class Trainer(object):
 
         # model hyper-parameters
         self.imsize = config.img_size 
-        self.g_num = config.g_num
         self.z_dim = config.z_dim
         self.channels = config.channels
         self.g_conv_dim = config.g_conv_dim
         self.d_conv_dim = config.d_conv_dim
         self.parallel = config.parallel
+        self.d_ite_num = config.d_ite_num
 
         self.lambda_gp = config.lambda_gp
+        self.epochs = config.epochs
         self.total_step = config.total_step
         self.d_iters = config.d_iters
         self.batch_size = config.batch_size
@@ -64,230 +66,155 @@ class Trainer(object):
         self.log_path = os.path.join(config.log_path, self.version)
         self.sample_path = os.path.join(config.sample_path, self.version)
 
-
         if self.use_tensorboard:
             self.build_tensorboard()
 
         self.build_model()
 
-        self.build_FID()
+        # self.build_FID()
 
     def train(self):
 
         # data iterator 
         data_iter = iter(self.data_loader)
         step_per_epoch = len(self.data_loader)
-        
-        # todo 
-        # start time
+
         start_time = time.time()
-        for step in range(self.total_step):
+        
+        print(count_parameters(self.G))
+        print(count_parameters(self.D))
 
-            # ==================== Train D ==================
-            self.D.train()
-            self.G.train()
+        real_label = 0.9
+        fake_label = 0
 
-            try:
-                real_images, labels = next(data_iter)
-            except:
-                data_iter = iter(self.data_loader)
-                real_images, labels = next(data_iter)
+        D_loss_list = []
+        G_loss_list = []
 
-            # compute loss with real images 
-            # dr1, dr2, df1, df2, gf1, gf2 are attention scores 
-            real_images = tensor2var(real_images)
-            labels = tensor2var(labels)
+        fixed_noise = torch.randn(self.batch_size, self.z_dim, 1, 1).cuda()
 
-            d_out_real, real_aux = self.D(real_images, labels)
+        fixed_aux_labels = np.random.randint(0, self.n_classes, 32)
+        fixed_aux_labels_ohe = np.eye(self.n_classes)[fixed_aux_labels]
+        fixed_aux_labels_ohe = torch.from_numpy(fixed_aux_labels_ohe[:, :, np.newaxis, np.newaxis])
+        fixed_aux_labels_ohe = fixed_aux_labels_ohe.float().cuda()
 
-            if self.adv_loss == 'wgan-gp':
-                d_loss_real = -torch.mean(d_out_real) + self.lambda_aux * self.c_loss(real_aux, labels)
-            elif self.adv_loss == 'hinge':
-                d_loss_real = torch.nn.ReLU()(1.0 - d_out_real).mean()
-            elif self.adv_loss == 'wgan-div':
-                d_loss_real = -torch.mean(d_out_real)
+        self.G.train()
+        self.D.train()
 
-            # apply Gumbel Softmax
-            z = tensor2var(torch.randn(real_images.size(0), self.z_dim)) # 64, 100
-            fake_images, gf = self.G(z, labels)
-            d_out_fake, fake_aux = self.D(fake_images, labels)
-            # todo
+        # training here 
+        for epoch in range(1, self.epochs + 1):
+            D_running_loss = 0
+            G_running_loss = 0
 
-            self.save_image_tensorboard(fake_images, 'D/fake_images', step)
+            for i, (imgs, labels) in enumerate(self.data_loader):
+                ##################
+                # udpate D network
+                ##################
+                for _ in range(self.d_ite_num):
 
-            if self.adv_loss == 'wgan-gp':
-                d_loss_fake = torch.mean(d_out_fake) + self.lambda_aux * self.c_loss(fake_aux, labels)
-            elif self.adv_loss == 'hinge':
-                d_loss_fake = torch.nn.ReLU()(1.0 + d_out_fake).mean()
-            elif self.adv_loss == 'wgan-div':
-                d_loss_fake = d_out_fake.mean()
+                    # because the batch size is not same as the dataloader.
+                    self.batch_size = imgs.size(0)
+                    # train with real 
+                    self.D.zero_grad()
+                    real_images = tensor2var(imgs)
+                    dis_labels = torch.full((self.batch_size, 1), real_label).cuda() # (*, 1)
+                    aux_labels = labels.long().cuda() # (*, )
+                    dis_output = self.D(real_images, aux_labels) # dis shape (*, 1)
 
-            
-            # backward + optimize 
-            d_loss = d_loss_real + d_loss_fake
-            # self.reset_grad()
-            # d_loss.backward()
-            # self.d_optimizer.step()
+                    errD_real = self.bce_loss(dis_output, dis_labels)
+                    errD_real.backward(retain_graph=True)
 
-            self.logger.add_scalar('d_loss_real + d_loss_fake', d_loss, step)
+                    # train with fake 
+                    noise = torch.randn(self.batch_size, self.z_dim, 1, 1).cuda()
 
-            if self.adv_loss == 'wgan-gp':
-                # compute gradient penalty
-                alpha = torch.rand(real_images.size(0), 1, 1, 1).cuda().expand_as(real_images)
-                # 64, 1, 64, 64
-                interpolated = Variable(alpha * real_images.data + (1 - alpha) * fake_images.data, requires_grad = True)
-                # 64
-                out, _ = self.D(interpolated, labels)
+                    aux_labels = np.random.randint(0, self.n_classes, self.batch_size)
+                    aux_labels_ohe = np.eye(self.n_classes)[aux_labels]
+                    aux_labels_ohe = torch.from_numpy(aux_labels_ohe[:, :, np.newaxis, np.newaxis])
+                    aux_labels_ohe = aux_labels_ohe.float().cuda()
 
-                grad = autograd.grad(
-                    outputs=out,
-                    inputs = interpolated,
-                    grad_outputs = torch.ones(out.size()).cuda(),
-                    retain_graph = True,
-                    create_graph = True,
-                    only_inputs = True
-                )[0]
+                    aux_labels = torch.from_numpy(aux_labels).long().cuda()
 
-                grad = grad.view(grad.size(0), -1)
-                grad_l2norm = torch.sqrt(torch.sum(grad ** 2, dim=1))
-                d_loss_gp = torch.mean((grad_l2norm - 1) ** 2)
+                    fake = self.G(noise, aux_labels_ohe) # (*, 3, 64, 64)
 
-                # backward + optimize 
-                d_loss_g = self.lambda_gp * d_loss_gp + d_loss
+                    dis_labels.fill_(fake_label)
+                    dis_output = self.D(fake.detach(), aux_labels)
 
-                self.reset_grad()
-                d_loss_g.backward()
-                self.d_optimizer.step()
+                    errD_fake = self.bce_loss(dis_output, dis_labels) 
+                    errD_fake.backward(retain_graph=True)
 
-                self.logger.add_scalar('d_loss_gp', d_loss_g, step)
-            
-            # todo
-            elif self.adv_loss == 'wgan-div':
-                p = 6
-                k = 2
+                    # store d running loss
+                    D_running_loss += (errD_real.item() +errD_fake.item()) / len(self.data_loader)
+                    self.d_optimizer.step()
 
-                # compute w-div gradient penalty
+                ##################
+                # update G network
+                ##################
+                self.G.zero_grad()
+                dis_labels.fill_(real_label) # fake labels are real for generator cost 
 
-                # real grad
-                interpolated = Variable(real_images, requires_grad = True)
-                out, _ = self.D(interpolated, labels)
+                # like up, but refrom because the random noise.
+                noise = torch.randn(self.batch_size, self.z_dim, 1, 1).cuda()
 
-                real_grad_out = torch.ones(real_images.size(0)).cuda()
+                aux_labels = np.random.randint(0, self.n_classes, self.batch_size)
+                aux_labels_ohe = np.eye(self.n_classes)[aux_labels]
+                aux_labels_ohe = torch.from_numpy(aux_labels_ohe[:, :, np.newaxis, np.newaxis])
+                aux_labels_ohe = aux_labels_ohe.float().cuda()
 
-                real_grad = autograd.grad(
-                    outputs = out,
-                    inputs = interpolated,
-                    grad_outputs = real_grad_out,
-                    retain_graph = True,
-                    create_graph = True,
-                    only_inputs = True,
-                )[0]
-                real_grad_norm = real_grad.view(real_grad.size(0), -1).pow(2).sum(1) ** (p / 2)
+                aux_labels = torch.from_numpy(aux_labels).long().cuda()
 
-                # fake grad
-                interpolated = Variable(fake_images, requires_grad = True)
-                out, _ = self.D(interpolated, labels)
+                fake = self.G(noise, aux_labels_ohe)
 
-                fake_grad_out = torch.ones(fake_images.size(0)).cuda()
+                dis_output = self.D(fake, aux_labels)
 
-                fake_grad = autograd.grad(
-                    outputs = out,
-                    inputs = interpolated,
-                    grad_outputs = fake_grad_out,
-                    retain_graph = True,
-                    create_graph = True,
-                    only_inputs = True,
-                )[0]
-                fake_grad_norm = fake_grad.view(fake_grad.size(0), -1).pow(2).sum(1) ** (p / 2)
+                errG = self.bce_loss(dis_output, dis_labels)
+                errG.backward(retain_graph = True)
 
-                # compute div_gp loss 
-                div_gp = torch.mean(real_grad_norm + fake_grad_norm) * k / 2
-
-                d_loss = div_gp
-
-                self.reset_grad()
-                d_loss.backward()
-                self.d_optimizer.step()
-
-                self.logger.add_scalar('d_loss_div', d_loss, step)
-
-            # train the generator every 5 steps
-            if step % self.g_num == 0:
-
-                # =================== Train G and gumbel =====================
-                # create random noise 
-                z = tensor2var(torch.randn(real_images.size(0), self.z_dim))
-                gen_labels = tensor2var(torch.LongTensor(np.random.randint(0, self.n_classes, self.batch_size)))
-                fake_images, attention = self.G(z, labels)
-
-                # save intermediate images
-                self.save_image_tensorboard(fake_images, 'G/fake_images', step)
-
-                # compute loss with fake images 
-                g_out_fake, pred_labels = self.D(fake_images, labels) # batch x n
-                if self.adv_loss == 'wgan-gp':
-                    g_loss_fake = -g_out_fake.mean() * self.lambda_aux + self.c_loss(pred_labels, labels)
-                if self.adv_loss == 'wgan-div':
-                    g_loss_fake = -g_out_fake.mean()
-
-                self.reset_grad()
-                g_loss_fake.backward()
+                G_running_loss += errG.item() / len(self.data_loader)
                 self.g_optimizer.step()
+                # end one epoch
 
-                self.logger.add_scalar('g_loss_fake', g_loss_fake, step)
+            # log 
+            D_loss_list.append(D_running_loss)
+            G_loss_list.append(G_running_loss)
+            # save tensorboard 
+            self.logger.add_scalar('D_loss', D_running_loss, epoch)
+            self.logger.add_scalar('G_loss', G_running_loss, epoch)
 
-            # calculate FID
-            # fretchet_dist = fid.calculate_fretchet(real_images, fake_images, self.fid_model)
-            # print out log info
-            if (step + 1) % self.log_step == 0:
+            # output 
+            if epoch % 10 == 0:
                 elapsed = time.time() - start_time
                 elapsed = str(datetime.timedelta(seconds=elapsed))
-                print("Elapsed [{}], G_step [{}/{}], D_step[{}/{}], d_out_gp: {:.4f}, g_loss: {:.4f}, "
-                      " ave_gamma_l3: {:.4f}, ave_gamma_l4: {:.4f}, Fretchet_Distance:".
-                      format(elapsed, step + 1, self.total_step, (step + 1),
-                             self.total_step , d_loss_g.item(), g_loss_fake.item(),
-                             self.G.attn1.gamma.mean().item(), self.G.attn2.gamma.mean().item() ))
-
+                print('[{:d}/{:d}] D_loss = {:.3f}, G_loss = {:.3f}, elapsed_time = {:.1f} min'.format(epoch,self.epochs,D_running_loss,G_running_loss, elapsed))
+            
             # sample images 
-            if (step + 1) % self.sample_step == 0:
-                self.save_sample(real_images, step)
-                # make the fake labels by classes 
-                labels = np.array([num for _ in range(self.n_classes) for num in range(self.n_classes)])
-                
-                # fixed input for debugging
-                fixed_z = tensor2var(torch.randn(self.n_classes ** 2, self.z_dim)) # 100, 100
+            if epoch % 10 == 0:
+                # save real image 
+                self.save_sample(real_images, epoch)
 
                 with torch.no_grad():
-                    labels = to_LongTensor(labels)
-                    fake_images, _= self.G(fixed_z, labels)
-                    self.save_image_tensorboard(fake_images[:64], 'G/from_noise', step+1)
-                    # save fake image 
-                    save_image(fake_images.data, 
-                                os.path.join(self.sample_path + '/fake_images/', '{}_fake.png'.format(step + 1)), nrow=self.n_classes, normalize=True)
+                    gen_image = self.G(fixed_noise, fixed_aux_labels).to('cpu').clone().detach().squeeze(0)
+                    save_image(gen_image.data,
+                            os.path.join(self.sample_path + '/fake_images/', '{}_fake.png'.format(epoch + 1)), 
+                            nrow=self.n_classes, normalize=True)
+
+            if epoch % 100 == 0:
+                torch.save(self.G.state_dict(), f'generator_epoch{epoch}.pth')
+                torch.save(self.D.state_dict(), 'discriminator.pth')
+        # end training 
 
 
     def build_model(self):
 
-        self.G = Generator(batch_size = self.batch_size, image_size = self.imsize, z_dim = self.z_dim, conv_dim = self.g_conv_dim, channels = self.channels, n_classes=self.n_classes).cuda()
-        self.D = Discriminator(batch_size = self.batch_size, image_size = self.imsize, conv_dim = self.d_conv_dim, channels = self.channels, n_classes=self.n_classes).cuda()
+        self.G = Generator(n_feat=16, codes_dim=24, n_classes=self.n_classes).cuda()
+        self.D = Discriminator(n_feat=16, n_classes=self.n_classes).cuda()
 
-        # apply the weights_init to randomly initialize all weights
-        # to mean=0, stdev=0.2
-        # self.G.apply(weights_init)
-        # self.D.apply(weights_init)
-        
         # loss and optimizer 
         self.g_optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.G.parameters()), self.g_lr, [self.beta1, self.beta2])
         self.d_optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.D.parameters()), self.d_lr, [self.beta1, self.beta2])
 
+        # loss function 
         self.c_loss = torch.nn.CrossEntropyLoss().cuda()
+        self.bce_loss = nn.BCELoss().cuda()
 
-        data_iter = iter(self.data_loader)
-        real_images, labels = next(data_iter)
-
-        self.logger.add_graph(self.D, (real_images.cuda(), labels.cuda()))
-        self.logger.close()
-        
         # print networks
         print(self.G)
         print(self.D)
@@ -317,15 +244,15 @@ class Trainer(object):
             self.logger.close()
 
 # %%
-import self_attention_gan.main  as main
-from self_attention_gan.dataset.dataset import getdDataset
+from dataset.dataset import getdDataset
+import main
 
 if __name__ == '__main__':
     config = main.get_parameters()
     config.total_step = 1000
-    config.img_size = 32
+    config.img_size = 64
+    config.batch_size = 64
     print(config)
-    # main(config)
     data_loader = getdDataset(config)
 
     trainer = Trainer(data_loader, config)

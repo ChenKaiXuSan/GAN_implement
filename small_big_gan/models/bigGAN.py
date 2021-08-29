@@ -130,14 +130,14 @@ class Generator(nn.Module):
         label_ohe.shape = (*, n_classes)
 
         Args:
-            z ([type]): [description]
-            label_ohe ([type]): [description]
-            codes_dim (int, optional): [description]. Defaults to 24.
+            z ([type]): [生成噪声，120 vetor]
+            label_ohe ([type]): [label经过one hot 编码]
+            codes_dim (int, optional): [给z分组。如果是120的vetor，分成5组]. Defaults to 24.
         '''
         batch = z.size(0)
         z = z.squeeze()
         label_ohe = label_ohe.squeeze()
-        codes = torch.split(z, codes_dim, dim=1)
+        codes = torch.split(z, codes_dim, dim=1) # to 5 group
 
         x = self.fc(codes[0]) # (*, 16ch*4*4)
         x = x.view(batch, -1, 4, 4) # (*, 16ch, 4, 4)
@@ -202,7 +202,7 @@ class Discriminator(nn.Module):
         h = self.res2(h) # (*, 2ch, 16, 16)
         h = self.res3(h) # (*, 4ch, 8, 8)
         h = self.res4(h) # (*, 8ch, 4, 4)
-        h = self.res5(h) # (*, 16ch, 4, 4)
+        h = self.res5(h) # (*, 16ch, 2, 2)
         h = torch.sum((F.leaky_relu(h, 0.2)).view(batch, -1, 4*4), dim=2) # GlobalSumPool (*, 16ch)
 
         outputs = self.fc(h) # (*, 1)

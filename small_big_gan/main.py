@@ -7,12 +7,13 @@ sys.path.append('..')
 sys.path.append('.')
 
 from trainer import Trainer
-from self_attention_gan.utils.utils import *
-from self_attention_gan.dataset.dataset import getdDataset
+from utils.utils import *
+from dataset.dataset import getdDataset
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import argparse
+
 # %%
 def get_parameters():
 
@@ -21,10 +22,10 @@ def get_parameters():
     # Model hyper-parameters
     parser.add_argument('--model', type=str, default='sagan', choices=['sagan', 'qgan'])
     parser.add_argument('--adv_loss', type=str, default='wgan-gp', choices=['wgan-gp', 'hinge', 'wgan-div'])
-    parser.add_argument('--img_size', type=int, default=128)
+    parser.add_argument('--img_size', type=int, default=64)
     parser.add_argument('--channels', type=int, default=3, help='number of image channels')
-    parser.add_argument('--g_num', type=int, default=5)
-    parser.add_argument('--z_dim', type=int, default=100)
+    parser.add_argument('--d_ite_num', type=int, default=1)
+    parser.add_argument('--z_dim', type=int, default=120)
     parser.add_argument('--g_conv_dim', type=int, default=64)
     parser.add_argument('--d_conv_dim', type=int, default=64)
     parser.add_argument('--lambda_gp', type=float, default=10)
@@ -32,6 +33,7 @@ def get_parameters():
     parser.add_argument('--lambda_aux', type=int, default=0.3, help='aux loss number')
 
     # Training setting
+    parser.add_argument('--epochs', type=int, default=500)
     parser.add_argument('--total_step', type=int, default=10000, help='how many times to update the generator')
     parser.add_argument('--d_iters', type=float, default=5)
     parser.add_argument('--batch_size', type=int, default=64)
@@ -65,7 +67,7 @@ def get_parameters():
     parser.add_argument('--model_save_step', type=float, default=1.0)
 
 
-    return parser.parse_args()
+    return parser.parse_args([])
 
 # %%
 def main(config):

@@ -10,7 +10,6 @@ sys.path.append('./')
 from torch.autograd import Variable
 import numpy as np
 
-from .spectral import SpectralNorm
 from .attention import *
 
 # %%
