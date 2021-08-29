@@ -213,3 +213,4 @@ class Discriminator(nn.Module):
 
         outputs = torch.sigmoid(outputs)
         return outputs
+

@@ -12,10 +12,6 @@ import torch.autograd as autograd
 
 import numpy as np
 
-import sys 
-sys.path.append('.')
-sys.path.append('..')
-
 from models.sagan import Generator, Discriminator
 from utils.utils import *
 import models.FID as fid
@@ -81,7 +77,8 @@ class Trainer(object):
         # data iterator 
         data_iter = iter(self.data_loader)
         step_per_epoch = len(self.data_loader)
-
+        
+        # todo 
         # start time
         start_time = time.time()
         for step in range(self.total_step):
