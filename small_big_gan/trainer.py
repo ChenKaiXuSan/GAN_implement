@@ -79,7 +79,7 @@ class Trainer(object):
         data_iter = iter(self.data_loader)
         step_per_epoch = len(self.data_loader)
 
-        start_time = time.time()
+     
         
         print(count_parameters(self.G))
         print(count_parameters(self.D))
@@ -92,7 +92,7 @@ class Trainer(object):
 
         fixed_noise = torch.randn(self.batch_size, self.z_dim, 1, 1).cuda()
 
-        fixed_aux_labels = np.random.randint(0, self.n_classes, 32)
+        fixed_aux_labels = np.random.randint(0, self.n_classes, self.batch_size)
         fixed_aux_labels_ohe = np.eye(self.n_classes)[fixed_aux_labels]
         fixed_aux_labels_ohe = torch.from_numpy(fixed_aux_labels_ohe[:, :, np.newaxis, np.newaxis])
         fixed_aux_labels_ohe = fixed_aux_labels_ohe.float().cuda()
@@ -106,6 +106,7 @@ class Trainer(object):
             G_running_loss = 0
 
             for i, (imgs, labels) in enumerate(self.data_loader):
+                start_time = time.time()
                 ##################
                 # udpate D network
                 ##################
@@ -141,8 +142,10 @@ class Trainer(object):
                     errD_fake = self.bce_loss(dis_output, dis_labels) 
                     errD_fake.backward(retain_graph=True)
 
-                    # store d running loss
-                    D_running_loss += (errD_real.item() +errD_fake.item()) / len(self.data_loader)
+                    self.reset_grad()
+                    
+                    errD_total = errD_real.item() + errD_fake.item() # for tensorboard
+                    D_running_loss += errD_total / len(self.data_loader)
                     self.d_optimizer.step()
 
                 ##################
@@ -166,41 +169,45 @@ class Trainer(object):
                 dis_output = self.D(fake, aux_labels)
 
                 errG = self.bce_loss(dis_output, dis_labels)
+
+                self.reset_grad()
                 errG.backward(retain_graph = True)
 
                 G_running_loss += errG.item() / len(self.data_loader)
                 self.g_optimizer.step()
-                # end one epoch
+            # end one epoch
+
+            # output for display, every 10 epoch.
+            if epoch % 10 == 0:
+                elapsed = time.time() - start_time
+                elapsed = str(datetime.timedelta(seconds=elapsed) * 60)
+                print('[{:d}/{:d}] D_loss = {:.3f}, G_loss = {:.3f}, elapsed_time = {} min'.format(
+                        epoch,self.epochs,D_running_loss,G_running_loss, elapsed))
 
             # log 
             D_loss_list.append(D_running_loss)
             G_loss_list.append(G_running_loss)
-            # save tensorboard 
-            self.logger.add_scalar('D_loss', D_running_loss, epoch)
-            self.logger.add_scalar('G_loss', G_running_loss, epoch)
 
-            # output 
-            if epoch % 10 == 0:
-                elapsed = time.time() - start_time
-                elapsed = str(datetime.timedelta(seconds=elapsed))
-                print('[{:d}/{:d}] D_loss = {:.3f}, G_loss = {:.3f}, elapsed_time = {:.1f} min'.format(epoch,self.epochs,D_running_loss,G_running_loss, elapsed))
-            
+            # for tensorboard, every epoch
+            self.logger.add_scalar('D_loss', errD_total, epoch)
+            self.logger.add_scalar('G_loss', errG.item(), epoch)
+
             # sample images 
             if epoch % 10 == 0:
                 # save real image 
                 self.save_sample(real_images, epoch)
 
                 with torch.no_grad():
-                    gen_image = self.G(fixed_noise, fixed_aux_labels).to('cpu').clone().detach().squeeze(0)
+                    gen_image = self.G(fixed_noise, fixed_aux_labels_ohe).to('cpu').clone().detach().squeeze(0)
                     save_image(gen_image.data,
                             os.path.join(self.sample_path + '/fake_images/', '{}_fake.png'.format(epoch + 1)), 
                             nrow=self.n_classes, normalize=True)
 
+            # save point, every 100 epoch
             if epoch % 100 == 0:
                 torch.save(self.G.state_dict(), f'generator_epoch{epoch}.pth')
                 torch.save(self.D.state_dict(), 'discriminator.pth')
-        # end training 
-
+        # end total epoch
 
     def build_model(self):
 

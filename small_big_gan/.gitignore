@@ -1,0 +1,4 @@
+# sample imgs
+*.png
+# save point
+*.pth
