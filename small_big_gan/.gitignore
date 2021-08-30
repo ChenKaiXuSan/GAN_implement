@@ -2,3 +2,5 @@
 *.png
 # save point
 *.pth
+# paper 
+paper/
