@@ -202,8 +202,9 @@ class Discriminator(nn.Module):
         h = self.res2(h) # (*, 2ch, 16, 16)
         h = self.res3(h) # (*, 4ch, 8, 8)
         h = self.res4(h) # (*, 8ch, 4, 4)
-        h = self.res5(h) # (*, 16ch, 2, 2)
-        h = torch.sum((F.leaky_relu(h, 0.2)).view(batch, -1, 4*4), dim=2) # GlobalSumPool (*, 16ch)
+        h = self.res5(h) # (*, 16ch, 4, 4)
+        high, weight = h.size(2), h.size(3)
+        h = torch.sum((F.leaky_relu(h, 0.2)).view(batch, -1, high*weight), dim=2) # GlobalSumPool (*, 16ch)
 
         outputs = self.fc(h) # (*, 1)
 
