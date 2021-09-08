@@ -11,7 +11,8 @@ from torchvision.utils import save_image
 
 import numpy as np
 
-from models.bigGAN import Generator, Discriminator
+# from models.bigGAN import Generator, Discriminator
+from models.bigGAN_noattn import Generator, Discriminator
 from utils.utils import *
 
 import models.FID as fid
