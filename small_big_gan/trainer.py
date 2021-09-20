@@ -1,6 +1,5 @@
 # %% 
 import os
-from posix import listdir 
 import time
 import torch
 import datetime
@@ -10,6 +9,7 @@ import torchvision
 from torchvision.utils import save_image
 
 import numpy as np
+import random
 
 # from models.bigGAN import Generator, Discriminator
 from models.bigGAN_noattn import Generator, Discriminator
@@ -20,6 +20,15 @@ import models.FID as fid
 # for draw network
 from torchviz import make_dot
 from torchvision import models
+
+# %% 
+# random seeds 
+seed = 2021
+random.seed(seed)
+torch.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
+np.random.seed(seed)
+os.environ['PYTHONHASHSEED'] = str(seed)
 
 # %%
 class Trainer(object):
@@ -41,7 +50,6 @@ class Trainer(object):
         self.d_n_feat = config.d_n_feat
         self.d_ite_num = config.d_ite_num
 
-        self.lambda_gp = config.lambda_gp
         self.epochs = config.epochs
         self.batch_size = config.batch_size
         self.num_workers = config.num_workers 
@@ -111,9 +119,10 @@ class Trainer(object):
                     real_images = imgs.cuda()
                     dis_labels = torch.full((self.batch_size, 1), real_label).cuda() # (*, 1)
                     aux_labels = labels.long().cuda() # (*, )
-                    dis_output = self.D(real_images, aux_labels) # dis shape (*, 1)
+                    dis_output, preds_real_labels = self.D(real_images, aux_labels) # dis shape (*, 1)
 
                     errD_real = self.bce_loss(dis_output, dis_labels)
+                    errD_real += self.c_loss(preds_real_labels, aux_labels) * 0.1 # coefficient gamma is quite sensitive.
                     errD_real.backward(retain_graph=True)
 
                     # train with fake 
@@ -129,9 +138,10 @@ class Trainer(object):
                     fake = self.G(noise, aux_labels_ohe) # (*, 3, 64, 64)
 
                     dis_labels.fill_(fake_label)
-                    dis_output = self.D(fake.detach(), aux_labels)
+                    dis_output, preds_fake_labels = self.D(fake.detach(), aux_labels)
 
-                    errD_fake = self.bce_loss(dis_output, dis_labels) 
+                    errD_fake = self.bce_loss(dis_output, dis_labels)
+                    errD_fake += self.c_loss(preds_fake_labels, aux_labels) * 0.1 # coefficient gamma is quite sensitive.
                     errD_fake.backward(retain_graph=True)
 
                     # self.reset_grad()
@@ -158,10 +168,10 @@ class Trainer(object):
 
                 fake = self.G(noise, aux_labels_ohe)
 
-                dis_output = self.D(fake, aux_labels)
+                dis_output, preds_fake_labels = self.D(fake, aux_labels)
 
                 errG = self.bce_loss(dis_output, dis_labels)
-
+                errG += self.c_loss(preds_fake_labels, aux_labels) * 0.1 # coefficient gamma is quite sensitive.
                 # self.reset_grad()
                 errG.backward(retain_graph = True)
 
@@ -211,8 +221,9 @@ class Trainer(object):
         self.d_optimizer = torch.optim.Adam(self.D.parameters(), lr=self.d_lr, betas=(self.beta1, self.beta2))
 
         # loss function 
-        self.c_loss = nn.CrossEntropyLoss().cuda()
+        # self.c_loss = nn.CrossEntropyLoss().cuda()
         self.bce_loss = nn.BCELoss().cuda()
+        self.c_loss = nn.NLLLoss().cuda()
 
         # print networks
         print(self.G)

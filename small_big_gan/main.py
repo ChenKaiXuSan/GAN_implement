@@ -1,10 +1,5 @@
 # %%
-import sys
-import os
 from utils.utils import make_folder
-
-sys.path.append('..')
-sys.path.append('.')
 
 from trainer import Trainer
 from utils.utils import *
@@ -28,8 +23,6 @@ def get_parameters():
     parser.add_argument('--z_dim', type=int, default=120)
     parser.add_argument('--g_n_feat', type=int, default=36)
     parser.add_argument('--d_n_feat', type=int, default=42)
-    parser.add_argument('--lambda_gp', type=float, default=10)
-    parser.add_argument('--version', type=str, default='debug')
 
     # Training setting
     parser.add_argument('--epochs', type=int, default=500)
@@ -47,7 +40,6 @@ def get_parameters():
 
     # Misc
     parser.add_argument('--train', type=str2bool, default=True)
-    parser.add_argument('--parallel', type=str2bool, default=False)
     parser.add_argument('--dataset', type=str, default='cifar10', choices=['mnist', 'cifar10', 'fashion', 'lsun'])
     parser.add_argument('--use_tensorboard', type=str2bool, default=True)
 
@@ -57,6 +49,7 @@ def get_parameters():
     parser.add_argument('--model_save_path', type=str, default='./models')
     parser.add_argument('--sample_path', type=str, default='./samples')
     parser.add_argument('--attn_path', type=str, default='./attn')
+    parser.add_argument('--version', type=str, default='debug')
 
     # Step size
     parser.add_argument('--log_step', type=int, default=10)
