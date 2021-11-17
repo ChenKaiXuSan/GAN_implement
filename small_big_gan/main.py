@@ -15,7 +15,6 @@ def get_parameters():
     parser = argparse.ArgumentParser()
 
     # Model hyper-parameters
-    parser.add_argument('--model', type=str, default='sagan', choices=['sagan', 'qgan'])
     parser.add_argument('--adv_loss', type=str, default='wgan-gp', choices=['wgan-gp', 'hinge', 'wgan-div'])
     parser.add_argument('--img_size', type=int, default=64)
     parser.add_argument('--channels', type=int, default=3, help='number of image channels')
@@ -56,7 +55,6 @@ def get_parameters():
     parser.add_argument('--sample_step', type=int, default=100)
     parser.add_argument('--model_save_step', type=float, default=1.0)
 
-
     return parser.parse_args()
 
 # %%
@@ -72,13 +70,11 @@ def main(config):
     # create directories if not exist
     make_folder(config.sample_path, config.version)
     make_folder(config.log_path, config.version)
-    # make_folder(config.attn_path, config.version)
     make_folder(config.sample_path, config.version + '/real_images')
     make_folder(config.sample_path, config.version + '/fake_images')
 
     if config.train:
-        if config.model == 'sagan':
-            trainer = Trainer(data_loader, config)
+        trainer = Trainer(data_loader, config)
         trainer.train()
     
 # %% 

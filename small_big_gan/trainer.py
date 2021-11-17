@@ -2,7 +2,7 @@
 import os
 import time
 import torch
-import datetime
+from torch import autograd
 
 import torch.nn as nn 
 import torchvision
@@ -18,8 +18,8 @@ from utils.utils import *
 import models.FID as fid
 
 # for draw network
-from torchviz import make_dot
-from torchvision import models
+# from torchviz import make_dot
+# from torchvision import models
 
 # %% 
 # random seeds 
@@ -39,7 +39,6 @@ class Trainer(object):
         self.data_loader = data_loader
 
         # exact model and loss 
-        self.model = config.model
         self.adv_loss = config.adv_loss
 
         # model hyper-parameters
@@ -64,8 +63,6 @@ class Trainer(object):
         self.dataset = config.dataset 
         self.use_tensorboard = config.use_tensorboard
         self.image_path = config.dataroot 
-        self.log_path = config.log_path
-        self.sample_path = config.sample_path
         self.log_step = config.log_step
         self.sample_step = config.sample_step
         self.version = config.version
@@ -82,13 +79,9 @@ class Trainer(object):
         # self.build_FID()
 
     def train(self):
-
-        # data iterator 
-        # data_iter = iter(self.data_loader)
-        # step_per_epoch = len(self.data_loader)
-
+        
         real_label = 0.9
-        fake_label = 0
+        fake_label = 0.0
 
         D_loss_list = []
         G_loss_list = []
@@ -111,42 +104,40 @@ class Trainer(object):
                 # udpate D network
                 ##################
                 for _ in range(self.d_ite_num):
+                    # for param in self.D.parameters():
+                    #     param.requires_grad_(True)
 
                     # because the batch size is not same as the dataloader.
                     self.batch_size = imgs.size(0)
                     # train with real 
                     self.D.zero_grad() # the next set the optimizer zero grad, so there not use it.
+                    # self.reset_grad()
+                    # self.d_optimizer.zero_grad()
                     real_images = imgs.cuda()
-                    dis_labels = torch.full((self.batch_size, 1), real_label).cuda() # (*, 1)
-                    aux_labels = labels.long().cuda() # (*, )
-                    dis_output, preds_real_labels = self.D(real_images, aux_labels) # dis shape (*, 1)
+                    aux_labels_real = labels.long().cuda() # (*, )
 
-                    errD_real = self.bce_loss(dis_output, dis_labels)
-                    errD_real += self.c_loss(preds_real_labels, aux_labels) * 0.1 # coefficient gamma is quite sensitive.
+                    dis_labels_real = torch.full((self.batch_size, 1), real_label).cuda() # (*, 1)
+                    dis_output_real, preds_real_labels = self.D(real_images, aux_labels_real) # dis shape (*, 1)
+
+                    errD_real = (self.bce_loss(dis_output_real, dis_labels_real) + self.c_loss(preds_real_labels, aux_labels_real)) / 2
                     errD_real.backward(retain_graph=True)
 
                     # train with fake 
                     noise = torch.randn(self.batch_size, self.z_dim, 1, 1).cuda()
 
-                    aux_labels = np.random.randint(0, self.n_classes, self.batch_size)
-                    aux_labels_ohe = np.eye(self.n_classes)[aux_labels]
-                    aux_labels_ohe = torch.from_numpy(aux_labels_ohe[:, :, np.newaxis, np.newaxis])
-                    aux_labels_ohe = aux_labels_ohe.float().cuda()
-
-                    aux_labels = torch.from_numpy(aux_labels).long().cuda()
+                    aux_labels_fake, aux_labels_ohe = self.sample_latents(self.batch_size, self.n_classes)
 
                     fake = self.G(noise, aux_labels_ohe) # (*, 3, 64, 64)
 
-                    dis_labels.fill_(fake_label)
-                    dis_output, preds_fake_labels = self.D(fake.detach(), aux_labels)
+                    dis_labels_fake = torch.full((self.batch_size, 1), fake_label).cuda() # (*, 1)
+                    # dis_labels_fake = dis_labels_real.fill_(fake_label)
+                    dis_output_fake, preds_fake_labels = self.D(fake.detach(), aux_labels_fake)
 
-                    errD_fake = self.bce_loss(dis_output, dis_labels)
-                    errD_fake += self.c_loss(preds_fake_labels, aux_labels) * 0.1 # coefficient gamma is quite sensitive.
+                    errD_fake = (self.bce_loss(dis_output_fake, dis_labels_fake) + self.c_loss(preds_fake_labels, aux_labels_fake)) / 2
                     errD_fake.backward(retain_graph=True)
 
-                    # self.reset_grad()
-                    
-                    errD_total = errD_real.item() + errD_fake.item() # for tensorboard
+                    errD_total = (errD_real.item() + errD_fake.item()) # for tensorboard
+
                     D_running_loss += errD_total / len(self.data_loader)
                     self.d_optimizer.step()
 
@@ -154,27 +145,26 @@ class Trainer(object):
                 # update G network
                 ##################
                 self.G.zero_grad() # the next set the optimizer zero grad, so there not use it.
-                dis_labels.fill_(real_label) # fake labels are real for generator cost 
+                # dis_labels_fake = torch.full((self.batch_size, 1), fake_label).cuda() # (*, 1) # fake labels are real for generator cost 
+
+                # for param in self.D.parameters():
+                #     param.requires_grad_(False)
 
                 # like up, but refrom because the random noise.
                 noise = torch.randn(self.batch_size, self.z_dim, 1, 1).cuda()
 
-                aux_labels = np.random.randint(0, self.n_classes, self.batch_size)
-                aux_labels_ohe = np.eye(self.n_classes)[aux_labels]
-                aux_labels_ohe = torch.from_numpy(aux_labels_ohe[:, :, np.newaxis, np.newaxis])
-                aux_labels_ohe = aux_labels_ohe.float().cuda()
+                # aux_labels_fake, aux_labels_ohe = self.sample_latents(self.batch_size, self.n_classes)
 
-                aux_labels = torch.from_numpy(aux_labels).long().cuda()
+                fake = self.G(noise, aux_labels_ohe) # (*, 3, 64, 64)
 
-                fake = self.G(noise, aux_labels_ohe)
+                dis_output, preds_fake_labels = self.D(fake, aux_labels_fake)
 
-                dis_output, preds_fake_labels = self.D(fake, aux_labels)
+                errG = self.bce_loss(dis_output, dis_labels_fake) + self.c_loss(preds_fake_labels, aux_labels_fake) * 0.5
 
-                errG = self.bce_loss(dis_output, dis_labels)
-                errG += self.c_loss(preds_fake_labels, aux_labels) * 0.1 # coefficient gamma is quite sensitive.
                 # self.reset_grad()
+                # errG = self.calc_advloss(dis_output_real, dis_output, type='G')
                 errG.backward(retain_graph = True)
-
+                
                 G_running_loss += errG.item() / len(self.data_loader)
                 self.g_optimizer.step()
 
@@ -187,7 +177,7 @@ class Trainer(object):
                 elapsed = time.time() - start_time
                 # elapsed = str(datetime.timedelta(seconds=elapsed) * 60)
                 print('[{:d}/{:d}] D_loss = {:.3f}, G_loss = {:.3f}, elapsed_time = {:.1f} min'.format(
-                        epoch,self.epochs,D_running_loss,G_running_loss, elapsed / 60))
+                        epoch,self.epochs,D_running_loss, G_running_loss, elapsed / 60))
 
             # log 
             D_loss_list.append(D_running_loss)
@@ -199,8 +189,6 @@ class Trainer(object):
 
             # sample images 
             self.save_sample(real_images, epoch)
-            # # sample one image for FID
-            # self.save_sample_one_image(real_images, epoch)
 
             # save point, every 100 epoch
             if epoch % 100 == 0:
@@ -221,9 +209,9 @@ class Trainer(object):
         self.d_optimizer = torch.optim.Adam(self.D.parameters(), lr=self.d_lr, betas=(self.beta1, self.beta2))
 
         # loss function 
-        # self.c_loss = nn.CrossEntropyLoss().cuda()
         self.bce_loss = nn.BCELoss().cuda()
-        self.c_loss = nn.NLLLoss().cuda()
+        # self.c_loss = nn.NLLLoss().cuda()
+        self.c_loss = nn.CrossEntropyLoss().cuda()
 
         # print networks
         print(self.G)
@@ -238,6 +226,28 @@ class Trainer(object):
     def reset_grad(self):
         self.d_optimizer.zero_grad()
         self.g_optimizer.zero_grad()
+
+    def sample_latents(self, batch_size, n_classes):
+        aux_labels = np.random.randint(0, n_classes, batch_size)
+        aux_labels_ohe = np.eye(n_classes)[aux_labels]
+        aux_labels_ohe = torch.from_numpy(aux_labels_ohe[:, :, np.newaxis, np.newaxis])
+        aux_labels_ohe = aux_labels_ohe.float().cuda()
+
+        aux_labels = torch.from_numpy(aux_labels).long().cuda()
+
+        return aux_labels, aux_labels_ohe
+
+    def calc_advloss(self, real, fake, margin=1.0, type='D'):
+        if type=='D':
+            loss_real = torch.mean((real - fake.mean() - margin) ** 2)
+            loss_fake = torch.mean((fake - real.mean() + margin) ** 2)
+        else:
+            loss_real = torch.mean((real - fake.mean() + margin) ** 2)
+            loss_fake = torch.mean((fake - real.mean() - margin) ** 2)
+
+        loss = (loss_real + loss_fake) / 2
+
+        return loss
 
     def save_sample(self, real_images, epoch):
         if epoch % 10 == 0:
@@ -264,7 +274,6 @@ class Trainer(object):
                         os.path.join(fake_image_path, '{}_fake.png'.format(epoch + 1)), 
                         nrow=self.n_classes, normalize=True)
 
-    # todo 保存的是最后要给mini batch 的图片，有可能是16张图片，不够
     def save_sample_one_image(self, real_images, epoch):
         if epoch % 10 == 0:
             
@@ -275,7 +284,6 @@ class Trainer(object):
 
             if len(os.listdir(real_images_path)) <= 1000:
                 # save real image 
-                # real_images_path = self.sample_path + '/' + str(epoch) + '/real_images/'
                 for i in range(real_images.size(0)):
                     one_real_image = real_images[i]
                     save_image(one_real_image.data,
@@ -284,8 +292,6 @@ class Trainer(object):
                     self.number_real += 1
 
                 # save fake image
-                # fake_image_path = self.sample_path + '/'+ str(epoch) + '/fake_images/'
-                
                 # for generate sample
                 fixed_noise = torch.randn(real_images.size(0), self.z_dim, 1, 1).cuda()
 
@@ -305,8 +311,6 @@ class Trainer(object):
                         )
                         self.number_fake += 1 
                 
-
-    
     def build_FID(self):
         block_idx = fid.InceptionV3.BLOCK_INDEX_BY_DIM[2048]
         model = fid.InceptionV3([block_idx])
@@ -318,32 +322,6 @@ class Trainer(object):
 
             self.logger.add_image(text + str(step), img_grid, step)
             self.logger.close()
-    
-    def draw_network(self):
-        noise = torch.randn(self.batch_size, self.z_dim, 1, 1).cuda()
-
-        generate_img = torch.randn(self.batch_size, self.channels, self.imsize, self.imsize).cuda()
-
-        aux_labels = np.random.randint(0, self.n_classes, self.batch_size)
-        aux_labels_ohe = np.eye(self.n_classes)[aux_labels]
-        aux_labels_ohe = torch.from_numpy(aux_labels_ohe[:, :, np.newaxis, np.newaxis])
-        aux_labels_ohe = aux_labels_ohe.float().cuda()
-
-        aux_labels = torch.from_numpy(aux_labels).long().cuda()
-        
-        # generator = self.G(noise, aux_labels_ohe)
-        # discriminator = self.D(generator, aux_labels)
-
-        # g = make_dot(generator)
-        # d = make_dot(discriminator)
-
-        self.logger.add_graph(self.G, [noise, aux_labels_ohe])
-        self.logger.add_graph(self.D, [generate_img, aux_labels])
-        # g = make_dot(y.mean(), params=dict(model.named_parameters()))
-        # g.view()
-        # d.view()
-
-
 
 # %%
 from dataset.dataset import getdDataset
@@ -359,5 +337,4 @@ if __name__ == '__main__':
 
     trainer = Trainer(data_loader, config)
     trainer.train()
-    # trainer.draw_network()
 # %%

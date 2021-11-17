@@ -5,24 +5,49 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "sagan",
+            "name": "sagan_wgan",
             "type": "python",
             "request": "launch",
             "program": "${workspaceRoot}/main.py",
             "console": "integratedTerminal",
             "args": [
                 "--dataset",
-                "cifar10",
+                "mnist",
                 "--channels",
-                "3",
+                "1",
                 "--sample_path",
                 "test_sample",
                 "--version",
                 "debug",
+                "--model",
+                "dcgan",
+                "--adv_loss",
+                "wgan"
             ]
         },
         {
-            "name": "gan",
+            "name": "sagan_wgan-gp",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--dataset",
+                "mnist",
+                "--channels",
+                "1",
+                "--sample_path",
+                "test_sample",
+                "--version",
+                "debug",
+                "--model",
+                "dcgan",
+                "--adv_loss",
+                "wgan-gp"
+            ]
+        },
+        {
+            "name": "sagan_wgan-div",
             "type": "python",
             "request": "launch",
             "program": "${workspaceRoot}/main.py",
@@ -43,7 +68,7 @@
             ]
         },
         {
-            "name": "dcgan_wgan-div",
+            "name": "sagan_gan",
             "type": "python",
             "request": "launch",
             "program": "${workspaceRoot}/main.py",
@@ -60,7 +85,7 @@
                 "--model",
                 "dcgan",
                 "--adv_loss",
-                "wgan-div"
+                "gan"
             ]
         }
     ]

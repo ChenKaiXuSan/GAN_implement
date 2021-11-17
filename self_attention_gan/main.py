@@ -1,14 +1,17 @@
 # %%
 import sys
 import os
-from utils.utils import make_folder
+
+from torch.utils.data import dataloader
 
 sys.path.append('..')
 sys.path.append('.')
 
 from trainer import Trainer
-from self_attention_gan.utils.utils import *
-from self_attention_gan.dataset.dataset import getdDataset
+from trainer_backbone import Trainer_backbone
+from trainer_dcgan import Trainer_dcgan
+from utils.utils import *
+from dataset.dataset import getdDataset
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
@@ -19,9 +22,9 @@ def get_parameters():
     parser = argparse.ArgumentParser()
 
     # Model hyper-parameters
-    parser.add_argument('--model', type=str, default='sagan', choices=['sagan', 'qgan'])
-    parser.add_argument('--adv_loss', type=str, default='wgan-gp', choices=['wgan-gp', 'hinge', 'wgan-div'])
-    parser.add_argument('--img_size', type=int, default=128)
+    parser.add_argument('--model', type=str, default='sagan', choices=['sagan', 'gan', 'dcgan'])
+    parser.add_argument('--adv_loss', type=str, default='wgan-gp', choices=['wgan-gp', 'gan', 'wgan-div'])
+    parser.add_argument('--img_size', type=int, default=64)
     parser.add_argument('--channels', type=int, default=3, help='number of image channels')
     parser.add_argument('--g_num', type=int, default=5)
     parser.add_argument('--z_dim', type=int, default=100)
@@ -36,6 +39,7 @@ def get_parameters():
     parser.add_argument('--d_iters', type=float, default=5)
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--num_workers', type=int, default=2)
+    # TTUR 
     parser.add_argument('--g_lr', type=float, default=0.0001)
     parser.add_argument('--d_lr', type=float, default=0.0004)
     parser.add_argument('--lr_decay', type=float, default=0.95)
@@ -87,6 +91,10 @@ def main(config):
     if config.train:
         if config.model == 'sagan':
             trainer = Trainer(data_loader, config)
+        elif config.model == 'gan':
+            trainer = Trainer_backbone(data_loader, config)
+        elif config.model == 'dcgan':
+            trainer = Trainer_dcgan(data_loader, config)
         trainer.train()
     
 # %% 

@@ -1,12 +1,10 @@
 # %% 
 import os 
 import time
-from numpy.lib.function_base import gradient
 import torch
 import datetime
 
 import torch.nn as nn 
-from torch.autograd import Variable
 import torchvision
 from torchvision.utils import save_image
 import torch.autograd as autograd
@@ -17,15 +15,13 @@ import sys
 sys.path.append('.')
 sys.path.append('..')
 
-# from models.sagan import Generator, Discriminator
 from models.sagan_backbone import Generator, Discriminator
 from utils.utils import *
-import models.FID as fid
 
 # %%
-class Trainer(object):
+class Trainer_backbone(object):
     def __init__(self, data_loader, config):
-        super(Trainer, self).__init__()
+        super(Trainer_backbone, self).__init__()
 
         # data loader 
         self.data_loader = data_loader
@@ -75,13 +71,14 @@ class Trainer(object):
 
         self.build_model()
 
-        self.build_FID()
-
     def train(self):
 
         # data iterator 
         data_iter = iter(self.data_loader)
         step_per_epoch = len(self.data_loader)
+
+        real_label = 0.9
+        fake_label = 0.0
 
         # start time
         start_time = time.time()
@@ -97,46 +94,52 @@ class Trainer(object):
                 data_iter = iter(self.data_loader)
                 real_images, labels = next(data_iter)
 
+            self.D.zero_grad()
             # compute loss with real images 
-            # dr1, dr2, df1, df2, gf1, gf2 are attention scores 
             real_images = tensor2var(real_images)
             labels = tensor2var(labels)
+
             gen_labels = tensor2var(torch.LongTensor(np.random.randint(0, self.n_classes, labels.size()[0])))
+
+            valid = tensor2var(torch.full((real_images.size(0), 1), real_label)) # (*, 1)
+            fake = tensor2var(torch.full((real_images.size(0), 1), fake_label)) # (*, 1)
 
 
             d_out_real, real_aux = self.D(real_images, labels)
 
             if self.adv_loss == 'wgan-gp':
-                d_loss_real = -torch.mean(d_out_real) #+ self.lambda_aux * self.c_loss(real_aux, labels)
-            elif self.adv_loss == 'hinge':
-                d_loss_real = torch.nn.ReLU()(1.0 - d_out_real).mean()
+                d_loss_real = - torch.mean(d_out_real)
+            elif self.adv_loss == 'gan':
+                # d_out_real = torch.sigmoid(d_out_real)
+                # d_loss_real = self.adversarial_loss(d_out_real, valid)
+                d_loss_real = self.adversarial_loss_sigmoid(d_out_real, valid)
 
             # apply Gumbel Softmax
             z = tensor2var(torch.randn(real_images.size(0), self.z_dim)) # 64, 100
-            fake_images, gf = self.G(z, gen_labels)
-            d_out_fake, fake_aux = self.D(fake_images, gen_labels)
+            fake_images = self.G(z, labels)
+            d_out_fake, fake_aux = self.D(fake_images.detach(), labels)
 
-            self.save_image_tensorboard(fake_images, 'D/fake_images', step)
+            # self.save_image_tensorboard(fake_images, 'D/fake_images', step)
 
             if self.adv_loss == 'wgan-gp':
-                d_loss_fake = torch.mean(d_out_fake) #+ self.lambda_aux * self.c_loss(fake_aux, gen_labels)
-            elif self.adv_loss == 'hinge':
-                d_loss_fake = torch.nn.ReLU()(1.0 + d_out_fake).mean()
+                d_loss_fake = torch.mean(d_out_fake)
+            elif self.adv_loss == 'gan':
+                # d_out_fake = torch.sigmoid(d_out_fake)
+                # d_loss_fake = self.adversarial_loss(d_out_fake, fake)
+                d_loss_fake = self.adversarial_loss_sigmoid(d_out_fake, fake)
 
             # backward + optimize 
             d_loss = d_loss_real + d_loss_fake
 
             if self.adv_loss == 'wgan-gp':
-                d_loss_gp = self.compute_gradient_penalty(self.D, real_images, fake_images, labels)
+                grad = self.compute_gradient_penalty(self.D, real_images, fake_images, labels)
+                d_loss = self.lambda_gp * grad + d_loss
 
-                # backward + optimize 
-                d_loss_g = self.lambda_gp * d_loss_gp + d_loss #+ self.lambda_aux * self.c_loss(real_aux, labels)
+            # self.reset_grad()
+            d_loss.backward()
+            self.d_optimizer.step()
 
-                self.reset_grad()
-                d_loss_g.backward()
-                self.d_optimizer.step()
-
-                self.logger.add_scalar('d_loss_gp', d_loss_g, step)
+            self.logger.add_scalar('d_loss_gp', d_loss, step)
 
             # train the generator every 5 steps
             if step % self.g_num == 0:
@@ -144,47 +147,52 @@ class Trainer(object):
                 # =================== Train G and gumbel =====================
                 # create random noise 
                 z = tensor2var(torch.randn(real_images.size()[0], self.z_dim))
-                fake_images, attention = self.G(z, gen_labels)
+                gen_labels = tensor2var(torch.LongTensor(np.random.randint(0, self.n_classes, labels.size()[0])))
+                fake_images = self.G(z, labels)
 
+                self.G.zero_grad()
                 # save intermediate images
                 self.save_image_tensorboard(fake_images, 'G/fake_images', step)
 
                 # compute loss with fake images 
-                g_out_fake, pred_labels = self.D(fake_images, gen_labels) # batch x n
-                if self.adv_loss == 'wgan-gp':
-                    g_loss_fake = -torch.mean(g_out_fake) + self.lambda_aux * self.c_loss(pred_labels, gen_labels)
+                g_out_fake, pred_labels = self.D(fake_images.detach(), labels) # batch x n
 
-                self.reset_grad()
+                if self.adv_loss == 'wgan-gp':
+                    g_loss_fake = - torch.mean(g_out_fake)
+                elif self.adv_loss == 'gan':
+                    # g_out_fake = torch.sigmoid(g_out_fake)
+                    # g_loss_fake = self.adversarial_loss(g_out_fake, fake) #+ self.lambda_aux * self.c_loss(pred_labels, gen_labels)
+                    g_loss_fake = self.adversarial_loss_sigmoid(g_out_fake, fake)
+
+                # self.reset_grad()
                 g_loss_fake.backward()
                 self.g_optimizer.step()
 
-                self.logger.add_scalar('g_loss_fake', g_loss_fake, step)
+                self.logger.add_scalar('g_loss_fake', g_loss_fake.data, step)
 
-            # calculate FID
-            # fretchet_dist = fid.calculate_fretchet(real_images, fake_images, self.fid_model)
             # print out log info
             if (step + 1) % self.log_step == 0:
                 elapsed = time.time() - start_time
                 elapsed = str(datetime.timedelta(seconds=elapsed))
                 print("Elapsed [{}], G_step [{}/{}], D_step[{}/{}], d_out_gp: {:.4f}, g_loss: {:.4f}, "
                       .format(elapsed, step + 1, self.total_step, (step + 1),
-                             self.total_step , d_loss_g.item(), g_loss_fake.item()))
+                             self.total_step , d_loss.item(), g_loss_fake.item()))
 
             # sample images 
             if (step + 1) % self.sample_step == 0:
                 self.save_sample(real_images, step)
                 # make the fake labels by classes 
-                labels = np.array([num for _ in range(self.n_classes) for num in range(self.n_classes)])
+                labels = np.array([num for _ in range(self.n_classes) for num in range(self.n_classes)]) # (10, 10)
                 
                 # fixed input for debugging
                 fixed_z = tensor2var(torch.randn(self.n_classes ** 2, self.z_dim)) # 100, 100
 
                 with torch.no_grad():
                     labels = to_LongTensor(labels)
-                    fake_images, _= self.G(fixed_z, labels)
-                    self.save_image_tensorboard(fake_images[:64], 'G/from_noise', step+1)
+                    fake_images = self.G(fixed_z, labels)
+                    # self.save_image_tensorboard(fake_images[:64], 'G/from_noise', step+1)
                     # save fake image 
-                    save_image(fake_images.data, 
+                    save_image(fake_images[:100].data, 
                                 os.path.join(self.sample_path + '/fake_images/', '{}_fake.png'.format(step + 1)), nrow=self.n_classes, normalize=True)
             
             # sample sample one images
@@ -198,8 +206,10 @@ class Trainer(object):
 
         # apply the weights_init to randomly initialize all weights
         # to mean=0, stdev=0.2
-        self.G.apply(init_weight)
-        self.D.apply(init_weight)
+        # self.G.apply(init_weight)
+        # self.D.apply(init_weight)
+        self.G.apply(weights_init)
+        self.D.apply(weights_init)
         
         # loss and optimizer 
         # self.g_optimizer = torch.optim.AdamW(filter(lambda p: p.requires_grad, self.G.parameters()), self.g_lr, [self.beta1, self.beta2])
@@ -207,15 +217,12 @@ class Trainer(object):
 
         self.g_optimizer = torch.optim.Adam(self.G.parameters(), self.g_lr, [self.beta1, self.beta2])
         self.d_optimizer = torch.optim.Adam(self.D.parameters(), self.d_lr, [self.beta1, self.beta2])
+
         # self.c_loss = torch.nn.CrossEntropyLoss().cuda()
-        self.c_loss = nn.NLLLoss().cuda()
+        self.c_loss = nn.NLLLoss()
+        self.adversarial_loss = nn.BCELoss()
+        self.adversarial_loss_sigmoid = nn.BCEWithLogitsLoss()
 
-        data_iter = iter(self.data_loader)
-        real_images, labels = next(data_iter)
-
-        self.logger.add_graph(self.D, (real_images.cuda(), labels.cuda()))
-        self.logger.close()
-        
         # print networks
         print(self.G)
         print(self.D)
@@ -231,11 +238,6 @@ class Trainer(object):
     def save_sample(self, real_images, step):
         path = self.sample_path + '/real_images/'
         save_image(real_images.data[:100], os.path.join(path, '{}_real.png'.format(step + 1)), normalize=True, nrow=self.n_classes)
-    
-    def build_FID(self):
-        block_idx = fid.InceptionV3.BLOCK_INDEX_BY_DIM[2048]
-        model = fid.InceptionV3([block_idx])
-        self.fid_model=model.cuda()
 
     def save_image_tensorboard(self, images, text, step):
         if step % 100 == 0:

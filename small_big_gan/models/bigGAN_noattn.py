@@ -8,19 +8,14 @@ import torch
 import torch.nn as nn 
 import torch.nn.functional as F
 
-import numpy as np 
+import numpy as np
+from torch.nn.utils import spectral_norm 
 
 def conv3x3(in_channels, out_channels): # not change resolusion
     return nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1, dilation=1, bias=False)
 
 def conv1x1(in_channels, out_channels): # not change resolusion
     return nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, dilation=1, bias=False)
-
-def deconv3x3(in_channels, out_channels): # not change resolusion
-    return nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1, dilation=1, bias=False)
-
-def deconv1x1(in_channels, out_channels): # not change resolusion
-    return nn.ConvTranspose2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1, dilation=1, bias=False)
 
 def init_weight(m):
     classname = m.__class__.__name__
@@ -75,46 +70,24 @@ class ConditionalNorm(nn.Module):
         super().__init__()
 
         self.bn = nn.BatchNorm2d(in_channel, affine=False) # no learning parameters
-        self.embed = nn.Linear(n_condition, in_channel * 2)
+        # self.embed = nn.Linear(n_condition, in_channel * 2)
+        self.embed = spectral_norm(conv1x1(n_condition, in_channel * 2))
 
-        nn.init.orthogonal_(self.embed.weight.data[:, :in_channel], gain=1)
-
-        self.embed.weight.data[:, in_channel:].zero_()
+        # nn.init.orthogonal_(self.embed.weight.data[:, :in_channel], gain=1)
+        # self.embed.weight.data[:, in_channel:].zero_()
+        nn.init.orthogonal_(self.embed.weight.data)
 
     def forward(self, inputs, label):
         out = self.bn(inputs)
-        embed = self.embed(label.float())
+        embed = self.embed(label.float().unsqueeze(2).unsqueeze(3))
         gamma, beta = embed.chunk(2, dim=1)
 
-        gamma = gamma.unsqueeze(2).unsqueeze(3)
-        beta = beta.unsqueeze(2).unsqueeze(3)
+        # gamma = gamma.unsqueeze(2).unsqueeze(3)
+        # beta = beta.unsqueeze(2).unsqueeze(3)
 
-        out = gamma * out + beta
+        out = (1.0 + gamma) * out + beta
 
         return out
-
-def bilinear_additive_upsampling(x, to_channel_num):
-    from_channel_num = x.size()[1]
-    assert from_channel_num % to_channel_num == 0
-
-    channel_split = from_channel_num // to_channel_num
-
-    new_shape = list(x.size())
-    new_shape[2] *= 2 # h*2
-    new_shape[3] *= 2 # w*2
-    new_shape[1] = to_channel_num # reduce the channels
-    
-    # upsampled_x = x.view(-1, new_shape[1], new_shape[2], new_shape[3])
-    upsampled_x = F.interpolate(x, new_shape[2:4]) # (*, channels, h*2, w*2)
-
-    output_list = []
-    for i in range(to_channel_num):
-        splited_upsampled_x = upsampled_x[:, i*channel_split:(i+1)*channel_split, ...]
-        output_list.append(torch.sum(splited_upsampled_x, dim=1))
-
-    output = torch.stack(output_list, dim=1)
-
-    return output
 
 # BigGAN
 class ResBlock_G(nn.Module):
@@ -123,48 +96,43 @@ class ResBlock_G(nn.Module):
 
         self.cbn1 = ConditionalNorm(in_channel, condition_dim)
 
-        # self.pixelShuffle = nn.Sequential()
-        # if upsample:
-        #     self.pixelShuffle.add_module('upsample', nn.PixelShuffle(upscale_factor=2))
-        # self.bilinear_additive_upsampling = nn.Sequential()
-        # if upsample:
-        #     self.bilinear_additive_upsampling.add_module('upsample', self.bilinear_additive_upsampling())
+        # in_channel = int(in_channel / 2)
 
-        in_channel = int(in_channel / 2)
-        # out_channel = int(out_channel / 4)
         self.conv3x3_1 = nn.utils.spectral_norm(conv3x3(in_channel, out_channel)).apply(init_weight)
         self.cbn2 = ConditionalNorm(out_channel, condition_dim)
         self.conv3x3_2 = nn.utils.spectral_norm(conv3x3(out_channel, out_channel)).apply(init_weight)
         self.conv1x1 = nn.utils.spectral_norm(conv1x1(in_channel, out_channel)).apply(init_weight)
 
+    def _bilinear_additive_upsampling(self, x, to_channel_num):
+        from_channel_num = x.size()[1]
+        assert from_channel_num % to_channel_num == 0
+
+        channel_split = from_channel_num // to_channel_num
+
+        new_shape = list(x.size())
+        new_shape[2] *= 2 # h*2
+        new_shape[3] *= 2 # w*2
+        new_shape[1] = to_channel_num # reduce the channels
+        
+        # upsampled_x = x.view(-1, new_shape[1], new_shape[2], new_shape[3])
+        upsampled_x = F.interpolate(x, new_shape[2:4]) # (*, channels, h*2, w*2)
+
+        output_list = []
+        for i in range(to_channel_num):
+            splited_upsampled_x = upsampled_x[:, i*channel_split:(i+1)*channel_split, ...]
+            output_list.append(torch.sum(splited_upsampled_x, dim=1))
+
+        output = torch.stack(output_list, dim=1)
+
+        return output
+
     def forward(self, inputs, condition):
         x = F.leaky_relu(self.cbn1(inputs, condition))
-        # x = self.pixelShuffle(x)
-        x = bilinear_additive_upsampling(x, int(x.size()[1] // 2))
+        x = self._bilinear_additive_upsampling(x, int(x.size()[1]))
         x = self.conv3x3_1(x)
         x = self.conv3x3_2(F.leaky_relu(self.cbn2(x, condition)))
-        # x += self.conv1x1(self.pixelShuffle(inputs)) # shortcut
-        x+= self.conv1x1(bilinear_additive_upsampling(inputs, int(inputs.size()[1] // 2)))
+        x = self.conv1x1(self._bilinear_additive_upsampling(inputs, int(inputs.size()[1]))) + x # normal add
         return x 
-
-# class ResBlock_G(nn.Module):
-#     def __init__(self, in_channel, out_channel, condition_dim):
-#         super().__init__()
-
-#         self.cbn1 = ConditionalNorm(in_channel, condition_dim)
-
-#         self.deconv3x3_1 = nn.utils.spectral_norm(deconv3x3(in_channel, out_channel)).apply(init_weight)
-#         self.cbn2 = ConditionalNorm(out_channel, condition_dim)
-#         self.deconv3x3_2 = nn.utils.spectral_norm(deconv3x3(out_channel, out_channel)).apply(init_weight)
-
-#         self.deconv1x1 = nn.utils.spectral_norm(deconv1x1(in_channel, out_channel)).apply(init_weight)
-
-#     def forward(self, inputs, condition):
-#         x = F.relu(self.cbn1(inputs, condition))
-#         x = self.deconv3x3_1(x)
-#         # x = self.deconv3x3_2(F.relu(self.cbn2(x, condition)))
-#         x += self.deconv1x1(inputs) # shortcut
-#         return x 
 
 class Generator(nn.Module):
     def __init__(self, n_feat, codes_dim=24, n_classes=10):
@@ -211,7 +179,7 @@ class Generator(nn.Module):
 
         condition = torch.cat([codes[3], label_ohe], dim=1)
         x = self.res3(x, condition) # (*, 4ch, 32, 32)
-        x = self.attn(x) # not change shape
+        # x = self.attn(x) # not change shape
 
         condition = torch.cat([codes[4], label_ohe], dim=1)
         x = self.res4(x, condition) # (*, 2ch, 64, 64)
@@ -240,7 +208,7 @@ class ResBlock_D(nn.Module):
 
     def forward(self, inputs):
         x = self.layer(inputs)
-        x += self.shortcut(inputs)
+        x = self.shortcut(inputs) + x # normal add
         return x 
 
 class Discriminator(nn.Module):
@@ -253,7 +221,7 @@ class Discriminator(nn.Module):
         self.res4 = ResBlock_D(4*n_feat, 8*n_feat, downsample=True)
         self.res5 = ResBlock_D(8*n_feat, 16*n_feat, downsample=False)
 
-        self.fc = nn.utils.spectral_norm(nn.Linear(16*n_feat, 1, bias=False)).apply(init_weight)
+        self.fc = nn.utils.spectral_norm(nn.Linear(16*n_feat, 1)).apply(init_weight)
         self.embedding = nn.utils.parametrizations.spectral_norm( 
             nn.Embedding(num_embeddings=n_classes, embedding_dim=16*n_feat)).apply(init_weight)
 
@@ -265,7 +233,7 @@ class Discriminator(nn.Module):
     def forward(self, inputs, label):
         batch = inputs.size(0) # (*, 3, 64, 64)
         h = self.res1(inputs) # (*, ch, 32, 32)
-        h = self.attn(h) # not change shape
+        # h = self.attn(h) # not change shape
         h = self.res2(h) # (*, 2ch, 16, 16)
         h = self.res3(h) # (*, 4ch, 8, 8)
         h = self.res4(h) # (*, 8ch, 4, 4)
@@ -275,10 +243,12 @@ class Discriminator(nn.Module):
 
         outputs = self.fc(h) # (*, 1)
 
+        # add the label info to the output
         if label is not None:
             embed = self.embedding(label) # (*, 16ch)
-            outputs += torch.sum(embed*h, dim=1, keepdim=True) # (*, 1)
+            outputs = torch.sum(embed*h, dim=1, keepdim=True) + outputs # (*, 1)
 
+        # for value
         outputs = torch.sigmoid(outputs)
 
         # for aux classifier

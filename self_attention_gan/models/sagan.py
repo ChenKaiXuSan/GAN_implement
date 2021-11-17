@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.utils import spectral_norm
 
 import sys
 sys.path.append('../..')
@@ -10,7 +11,6 @@ sys.path.append('./')
 from torch.autograd import Variable
 import numpy as np
 
-from .spectral import SpectralNorm
 from .attention import *
 
 # %%
@@ -41,7 +41,7 @@ class Generator(nn.Module):
         self.imsize = image_size
         self.channels = channels
         self.n_classes = n_classes
-        self.label_emb = nn.Embedding(n_classes, z_dim).cuda()
+        self.label_emb = nn.Embedding(n_classes, n_classes).cuda()
 
         layer1 = []
         layer2 = []
@@ -52,42 +52,66 @@ class Generator(nn.Module):
 
         repeat_num = int(np.log2(self.imsize)) - 3  # 3
         mult = 2 ** repeat_num  # 8
-        layer1.append(SpectralNorm(
-            nn.ConvTranspose2d(z_dim, conv_dim * mult, 4, 1, 0, bias=False)))
-        # layer1.append(nn.BatchNorm2d(conv_dim * mult))
+        # layer1.append(SpectralNorm(
+        #     nn.ConvTranspose2d(z_dim, conv_dim * mult, 4, 1, 0, bias=False)))
+        # # layer1.append(nn.BatchNorm2d(conv_dim * mult))
+        # layer1.append(nn.ReLU())
+
+        layer1.append(spectral_norm(
+            nn.ConvTranspose2d(z_dim + self.n_classes, conv_dim * mult, 4, 1, 0, bias=False)
+        ))
         layer1.append(nn.ReLU())
 
         self.attn1 = Self_Attn(conv_dim * mult, 'relu')
 
         curr_dim = conv_dim * mult
 
-        layer2.append(SpectralNorm(
-            nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias = False)))
-        # layer2.append(nn.BatchNorm2d(int(curr_dim / 2)))
+        # layer2.append(SpectralNorm(
+        #     nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias = False)))
+        # # layer2.append(nn.BatchNorm2d(int(curr_dim / 2)))
+        # layer2.append(nn.ReLU())
+
+        layer2.append(spectral_norm(
+            nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False)
+        ))
         layer2.append(nn.ReLU())
 
         self.attn2 = Self_Attn(int(curr_dim / 2), 'relu')
         curr_dim = int(curr_dim / 2)
 
-        layer3.append(SpectralNorm(
-            nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False)))
-        # layer3.append(nn.BatchNorm2d(int(curr_dim / 2)))
+        # layer3.append(SpectralNorm(
+        #     nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False)))
+        # # layer3.append(nn.BatchNorm2d(int(curr_dim / 2)))
+        # layer3.append(nn.ReLU())
+
+        layer3.append(spectral_norm(
+            nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False)
+        ))
         layer3.append(nn.ReLU())
 
         self.attn3 = Self_Attn(int(curr_dim / 2), 'relu')
         
         curr_dim = int(curr_dim / 2)
 
-        layer4.append(SpectralNorm(
-            nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False)))
-        # layer4.append(nn.BatchNorm2d(int(curr_dim / 2)))
+        # layer4.append(SpectralNorm(
+        #     nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False)))
+        # # layer4.append(nn.BatchNorm2d(int(curr_dim / 2)))
+        # layer4.append(nn.ReLU())
+
+        layer4.append(spectral_norm(
+            nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False)
+        ))
         layer4.append(nn.ReLU())
         
         self.attn4 = Self_Attn(int(curr_dim / 2), 'relu')
 
         curr_dim = int(curr_dim / 2)
 
-        layer5.append(SpectralNorm(
+        # layer5.append(SpectralNorm(
+        #     nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False)
+        # ))
+        # layer5.append(nn.ReLU())
+        layer5.append(spectral_norm(
             nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False)
         ))
         layer5.append(nn.ReLU())
@@ -111,20 +135,20 @@ class Generator(nn.Module):
 
         labels_emb = self.label_emb(labels).cuda()
 
-        input = torch.mul(labels_emb, z)
-        # input = torch.cat((labels_emb, z), 1)
+        # input = torch.mul(labels_emb, z)
+        input = torch.cat((labels_emb, z), 1)
 
         input = input.view(input.size(0), input.size(1), 1, 1)
 
         out = self.l1(input)
-        # out, p = self.attn1(out)
+        out, p = self.attn1(out)
         out = self.l2(out)
-        # out, p = self.attn2(out)
+        out, p = self.attn2(out)
         out = self.l3(out)
-        # out, p = self.attn3(out)
+        out, p = self.attn3(out)
 
         out = self.l4(out)
-        # out, p = self.attn4(out)
+        out, p = self.attn4(out)
 
         out = self.l5(out)
 
@@ -154,42 +178,65 @@ class Discriminator(nn.Module):
         last_adv_layer = []
         last_aux_layer = []
 
-        layer1.append(SpectralNorm(
-            nn.Conv2d(self.n_classes + self.channels, conv_dim, 4, 2, 1, bias=False)))
+        # layer1.append(SpectralNorm(
+        #     nn.Conv2d(self.n_classes + self.channels, conv_dim, 4, 2, 1, bias=False)))
+        # layer1.append(nn.LeakyReLU(0.1))
+        layer1.append(spectral_norm(
+            nn.Conv2d(self.n_classes + self.channels, conv_dim, 4, 2, 1, bias=False)
+        ))
         layer1.append(nn.LeakyReLU(0.1))
 
         self.attn1 = Self_Attn(conv_dim, 'relu')
 
         curr_dim = conv_dim
 
-        layer2.append(SpectralNorm(
-            nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False)))
-        # layer2.append(nn.BatchNorm2d(curr_dim * 2, ))
+        # layer2.append(SpectralNorm(
+        #     nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False)))
+        # # layer2.append(nn.BatchNorm2d(curr_dim * 2, ))
+        # layer2.append(nn.LeakyReLU(0.1))
+        layer2.append(spectral_norm(
+            nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False)
+        ))
         layer2.append(nn.LeakyReLU(0.1))
 
         self.attn2 = Self_Attn(curr_dim * 2, 'relu')
 
         curr_dim = curr_dim * 2
         
-        layer3.append(SpectralNorm(
-            nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False)))
-        # layer3.append(nn.BatchNorm2d(curr_dim * 2))
+        # layer3.append(SpectralNorm(
+        #     nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False)))
+        # # layer3.append(nn.BatchNorm2d(curr_dim * 2))
+        # layer3.append(nn.LeakyReLU(0.1))
+
+        layer3.append(spectral_norm(
+            nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False)
+        ))
         layer3.append(nn.LeakyReLU(0.1))
         
         self.attn3 = Self_Attn(curr_dim * 2, 'relu')
 
         curr_dim = curr_dim * 2
 
-        layer4.append(SpectralNorm(
-            nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False)))
-        # layer4.append(nn.BatchNorm2d(curr_dim * 2))
+        # layer4.append(SpectralNorm(
+        #     nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False)))
+        # # layer4.append(nn.BatchNorm2d(curr_dim * 2))
+        # layer4.append(nn.LeakyReLU(0.1))
+
+        layer4.append(spectral_norm(
+            nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False)
+        ))
         layer4.append(nn.LeakyReLU(0.1))
 
         self.attn4 = Self_Attn(curr_dim * 2, 'relu')
 
         curr_dim = curr_dim * 2
 
-        layer5.append(SpectralNorm(
+        # layer5.append(SpectralNorm(
+        #     nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False)
+        # ))
+        # layer5.append(nn.LeakyReLU(0.1))
+
+        layer5.append(spectral_norm(
             nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False)
         ))
         layer5.append(nn.LeakyReLU(0.1))
@@ -206,17 +253,17 @@ class Discriminator(nn.Module):
         last_adv_layer.append(nn.Conv2d(curr_dim, 1, 4, 1, 0, bias=False))
 
         last_aux_layer.append(nn.Conv2d(curr_dim, self.n_classes, 4, 1, 0, bias=False))
-        last_aux_layer.append(nn.Softmax())
+        last_aux_layer.append(nn.Softmax(dim=1))
 
         self.last_adv = nn.Sequential(*last_adv_layer)
         self.last_aux = nn.Sequential(*last_aux_layer)
 
     def forward(self, x, labels):
-        labels_fill = fill_labels(x.size()[2])[labels] # 10, 10, img_size, img_size torch.cuda.floattensor
-        input = torch.cat((x, labels_fill), 1) # torch.cuda.floattensor
+        # labels_fill = fill_labels(x.size()[2])[labels] # 10, 10, img_size, img_size torch.cuda.floattensor
+        # input = torch.cat((x, labels_fill), 1) # torch.cuda.floattensor
         # input = torch.mul(x, labels_fill)
 
-        out = self.l1(input)
+        out = self.l1(x)
         # out, p = self.attn1(out)
         out = self.l2(out)
         # out, p = self.attn2(out)
@@ -243,7 +290,7 @@ if __name__ == '__main__':
     image = torch.randn(64, 1, 64, 64)
     image = image.cuda()
 
-    z = torch.randn(64, 128)
+    z = torch.randn(64, 100)
     z = z.cuda()
 
     label = torch.randn(64)
