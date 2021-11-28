@@ -62,7 +62,7 @@
                 "--version",
                 "debug",
                 "--model",
-                "dcgan",
+                "sagan",
                 "--adv_loss",
                 "wgan-div"
             ]
@@ -86,6 +86,27 @@
                 "dcgan",
                 "--adv_loss",
                 "gan"
+            ]
+        },
+        {
+            "name": "sagan_wgan-gp(ori)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--dataset",
+                "mnist",
+                "--channels",
+                "1",
+                "--sample_path",
+                "test_sample",
+                "--version",
+                "debug",
+                "--model",
+                "sagan",
+                "--adv_loss",
+                "wgan-gp"
             ]
         }
     ]

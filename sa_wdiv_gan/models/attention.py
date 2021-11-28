@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn 
 import torch.nn.functional as F
 
-import numpy as np
 from torch.nn.utils import spectral_norm 
 
 def conv1x1(in_channels, out_channels): # not change resolusion
@@ -12,11 +11,11 @@ class Attention(nn.Module):
     def __init__(self, channels):
         super().__init__()
         self.channels = channels
-        self.theta = nn.utils.spectral_norm(conv1x1(channels, channels // 8))
-        self.phi = nn.utils.spectral_norm(conv1x1(channels, channels // 8))
+        self.theta = spectral_norm(conv1x1(channels, channels // 8))
+        self.phi = spectral_norm(conv1x1(channels, channels // 8))
 
-        self.g = nn.utils.spectral_norm(conv1x1(channels, channels // 2))
-        self.o = nn.utils.spectral_norm(conv1x1(channels // 2, channels))
+        self.o = spectral_norm(conv1x1(channels // 2, channels))
+        self.g = spectral_norm(conv1x1(channels, channels // 2))
 
         self.gamma = nn.Parameter(torch.tensor(0.), requires_grad=True)
 

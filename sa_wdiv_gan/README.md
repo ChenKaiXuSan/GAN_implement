@@ -1,4 +1,4 @@
-# WassersteinGAN-PyTorch
+# Full Self-Attention GAN with different Loss Function
 ## Overview
 This repository contains an Pytorch implementation of WGAN, WGAN-GP, WGAN-DIV and original GAN loss function.
 With full coments and my code style.
@@ -18,63 +18,7 @@ We introduce a new algorithm named WGAN, an alternative to traditional GAN train
 
 ## Implement
 ``` python
-usage: main.py [-h] [--model {gan,dcgan}]
-               [--adv_loss {wgan-gp,gan,wgan-div,wgan}] [--img_size IMG_SIZE]
-               [--channels CHANNELS] [--g_num G_NUM] [--z_dim Z_DIM]
-               [--g_conv_dim G_CONV_DIM] [--d_conv_dim D_CONV_DIM]
-               [--lambda_gp LAMBDA_GP] [--version VERSION]
-               [--clip_value CLIP_VALUE] [--epochs EPOCHS]
-               [--batch_size BATCH_SIZE] [--num_workers NUM_WORKERS]
-               [--g_lr G_LR] [--d_lr D_LR] [--beta1 BETA1] [--beta2 BETA2]
-               [--pretrained_model PRETRAINED_MODEL] [--train TRAIN]
-               [--parallel PARALLEL] [--dataset {mnist,cifar10,fashion}]
-               [--use_tensorboard USE_TENSORBOARD] [--dataroot DATAROOT]
-               [--log_path LOG_PATH] [--model_save_path MODEL_SAVE_PATH]
-               [--sample_path SAMPLE_PATH] [--log_step LOG_STEP]
-               [--sample_step SAMPLE_STEP] [--model_save_step MODEL_SAVE_STEP]
 
-optional arguments:
-  -h, --help            show this help message and exit
-  --model {gan,dcgan}
-  --adv_loss {wgan-gp,gan,wgan-div,wgan}
-  --img_size IMG_SIZE
-  --channels CHANNELS   number of image channels
-  --g_num G_NUM         train the generator every 5 steps
-  --z_dim Z_DIM         noise dim
-  --g_conv_dim G_CONV_DIM
-  --d_conv_dim D_CONV_DIM
-  --lambda_gp LAMBDA_GP
-                        for wgan gp
-  --version VERSION     the version of the path, for implement
-  --clip_value CLIP_VALUE
-                        lower and upper clip value for disc. weights, from the
-                        wgan
-  --epochs EPOCHS       numer of epochs of training
-  --batch_size BATCH_SIZE
-                        batch size for the dataloader
-  --num_workers NUM_WORKERS
-  --g_lr G_LR           use TTUR lr rate for Adam
-  --d_lr D_LR           use TTUR lr rate for Adam
-  --beta1 BETA1
-  --beta2 BETA2
-  --pretrained_model PRETRAINED_MODEL
-  --train TRAIN
-  --parallel PARALLEL
-  --dataset {mnist,cifar10,fashion}
-  --use_tensorboard USE_TENSORBOARD
-  
-                        use tensorboard to record the loss
-  --dataroot DATAROOT   dataset path
-  --log_path LOG_PATH   the output log path
-  --model_save_path MODEL_SAVE_PATH
-                        model save path
-  --sample_path SAMPLE_PATH
-                        the generated sample saved path
-  --log_step LOG_STEP   every default{10} epoch save to the log
-  --sample_step SAMPLE_STEP
-                        every default{100} epoch save the generated images and
-                        real images
-  --model_save_step MODEL_SAVE_STEP
 ```
 ## Usage
 - MNSIT
@@ -90,7 +34,12 @@ FID is a measure of similarity between two datasets of images. It was shown to c
 For the FID, I use the pytorch implement of this repository. [FID score for PyTorch](https://github.com/mseitzer/pytorch-fid)
 
 - MNIST
-For the 10k epochs training on MNIST dataset, compare with about 2430 samples, I get the FID: 
+For the 10k epochs training on MNIST dataset, compare with about 10k samples, I get the FID: 
+
+full attention with wgan,  170.92795769315165
+>:warning: not good.
+
+
 
 | dataset | wgan | wgan-gp | wgan-div |
 | ---- | ---- | ---- | ---- |

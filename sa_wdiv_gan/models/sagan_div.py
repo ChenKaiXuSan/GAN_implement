@@ -1,13 +1,12 @@
 # %%
 '''
-pure dcgan structure.
 code similar sample from the pytorch code, and with the spectral normalization.
 https://pytorch.org/tutorials/beginner/dcgan_faces_tutorial.html
 
 SAGAN implement.
-with full attention in every layer.
+with full attention in every layer in the generator.
+And with the instance normalization instead of the batch normal.
 '''
-import torch
 import torch.nn as nn
 from torch.nn.utils import spectral_norm
 import torch.nn.functional as F
@@ -36,7 +35,7 @@ class Generator(nn.Module):
             spectral_norm(
                 nn.ConvTranspose2d(self.z_dim, conv_dim * mult, 4, 1, 0, bias=False),
             ),
-            nn.BatchNorm2d(conv_dim * mult),
+            nn.InstanceNorm2d(conv_dim * mult),
             nn.ReLU(True)
         )
 
@@ -46,7 +45,7 @@ class Generator(nn.Module):
             spectral_norm(
                 nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False),
             ),
-            nn.BatchNorm2d(int(curr_dim / 2)),
+            nn.InstanceNorm2d(conv_dim * mult),
             nn.ReLU(True)
         )
 
@@ -56,7 +55,7 @@ class Generator(nn.Module):
             spectral_norm(
                 nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False),
             ),
-            nn.BatchNorm2d(int(curr_dim / 2)),
+            nn.InstanceNorm2d(conv_dim * mult),
             nn.ReLU(True),
         )
 
@@ -66,7 +65,7 @@ class Generator(nn.Module):
             spectral_norm(
                 nn.ConvTranspose2d(curr_dim, int(curr_dim / 2), 4, 2, 1, bias=False),
             ),
-            nn.BatchNorm2d(int(curr_dim / 2)),
+            nn.InstanceNorm2d(conv_dim * mult),
             nn.ReLU(True)
         )
         
@@ -114,6 +113,7 @@ class Discriminator(nn.Module):
             spectral_norm(
                 nn.Conv2d(self.channels, conv_dim, 4, 2, 1, bias=False),
             ),
+            nn.InstanceNorm2d(conv_dim),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
@@ -123,6 +123,7 @@ class Discriminator(nn.Module):
             spectral_norm(
                 nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False),
             ),
+            nn.InstanceNorm2d(curr_dim * 2),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
@@ -132,6 +133,7 @@ class Discriminator(nn.Module):
             spectral_norm(
                 nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False),
             ),
+            nn.InstanceNorm2d(curr_dim * 2),
             nn.LeakyReLU(0.2, inplace=True)
         )
         
@@ -141,15 +143,16 @@ class Discriminator(nn.Module):
             spectral_norm(
                 nn.Conv2d(curr_dim, curr_dim * 2, 4, 2, 1, bias=False),
             ),
+            nn.InstanceNorm2d(curr_dim * 2),
             nn.LeakyReLU(0.2, inplace=True)
         )
 
         curr_dim = curr_dim * 2
         
-        self.attn1 = Attention(64)
-        self.attn2 = Attention(128)
-        self.attn3 = Attention(256)
-        self.attn4 = Attention(512)
+        # self.attn1 = Attention(64)
+        # self.attn2 = Attention(128)
+        # self.attn3 = Attention(256)
+        # self.attn4 = Attention(512)
 
         # output layers
         # (*, 512, 4, 4)
@@ -162,14 +165,10 @@ class Discriminator(nn.Module):
 
     def forward(self, x):
         out = self.l1(x) # (*, 64, 32, 32)
-        attn1 = self.attn1(out)
-        out = self.l2(attn1) # (*, 128, 16, 16)
-        attn2 = self.attn2(out)
-        out = self.l3(attn2) # (*, 256, 8, 8)
-        attn3 = self.attn3(out)
-        out = self.l4(attn3) # (*, 512, 4, 4)
-        attn4 = self.attn4(out)
+        out = self.l2(out) # (*, 128, 16, 16)
+        out = self.l3(out) # (*, 256, 8, 8)
+        out = self.l4(out) # (*, 512, 4, 4)
 
-        validity = self.last_adv(attn4) # (*, 1, 1, 1)
+        validity = self.last_adv(out) # (*, 1, 1, 1)
 
         return validity.squeeze()
