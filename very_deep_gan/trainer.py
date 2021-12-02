@@ -11,7 +11,8 @@ import torch.nn as nn
 import torchvision
 from torchvision.utils import save_image
 
-from models.dcgan import Generator, Discriminator
+# from models.dcgan import Generator, Discriminator
+from models.very_deep_gan import Generator, Discriminator
 from utils.utils import *
 
 # %%
