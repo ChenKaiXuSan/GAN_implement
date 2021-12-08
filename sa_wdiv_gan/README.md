@@ -4,10 +4,7 @@ This repository contains an Pytorch implementation of WGAN, WGAN-GP, WGAN-DIV an
 With full coments and my code style.
 
 ## About WGAN
-If you're new to WassersteinGAN, here's an abstract straight from the paper[1]:
-
-We introduce a new algorithm named WGAN, an alternative to traditional GAN training. In this new model, we show that we can improve the stability of learning, get rid of problems like mode collapse, and provide meaningful learning curves useful for debugging and hyperparameter searches. Furthermore, we show that the corresponding optimization problem is sound, and provide extensive theoretical work highlighting the deep connections to other distances between distributions.
-
+![structure](img/network_structure.png)
 ## Dataset 
 - MNIST
 `python3 main.py --dataset mnist --channels 1`
@@ -33,25 +30,11 @@ FID is a measure of similarity between two datasets of images. It was shown to c
 
 For the FID, I use the pytorch implement of this repository. [FID score for PyTorch](https://github.com/mseitzer/pytorch-fid)
 
-- MNIST
-For the 10k epochs training on MNIST dataset, compare with about 10k samples, I get the FID: 
-
-full attention with wgan,  170.92795769315165
->:warning: not good.
-
-
-
-| dataset | wgan | wgan-gp | wgan-div |
-| ---- | ---- | ---- | ---- |
-| MNIST | 47.26201497530761 | 108.48196049057748 | 83.1224650636957 |
-| FASHION-MNIST | 75.43994192943677 | NULL | NULL
-| CIFAR10 | 121.84612610331084 | 160.36441830128024 | 124.66761784583213 |
- 
-> :warning: I dont konw if the FID is right or not, because I cant get the lowwer score like the paper or the other people get it. 
+| Method | MNIST | cifar10 |
+| ---- | ---- | ---- |
+| attnG_wgandiv | 97.7207 | null | 
+| attnG_wgandiv_nobatch | NULL | NULL |
+| fullattn_wgangp_ori | 110.4787 | null | 
 
 ## Reference
 1. [WGAN](https://arxiv.org/abs/1701.07875)
-2. [WGAN-GP](https://arxiv.org/abs/1704.00028)
-3. [WGAN-DIV](https://arxiv.org/abs/1712.01026)
-4. [DCGAN](https://arxiv.org/abs/1511.06434)
-5. [CT-GAN](https://arxiv.org/abs/1803.01541)(todo)
