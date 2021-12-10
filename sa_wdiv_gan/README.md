@@ -35,6 +35,8 @@ For the FID, I use the pytorch implement of this repository. [FID score for PyTo
 | attnG_wgandiv | 97.7207 | null | 
 | attnG_wgandiv_nobatch | NULL | NULL |
 | fullattn_wgangp_ori | 110.4787 | null | 
+| attnG_SND_wgandiv | null | null |
+| attnG_wgandiv_nosn | null | null |
 
 ## Reference
 1. [WGAN](https://arxiv.org/abs/1701.07875)

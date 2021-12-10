@@ -15,8 +15,9 @@ from torchvision.utils import save_image
 import numpy as np
 
 # from models.sagan import Generator, Discriminator
-from models.sagan_div import Generator, Discriminator
+# from models.sagan_div import Generator, Discriminator
 # from models.sagan_div_nobatch import Generator, Discriminator
+from models.sagan_div_SND import Generator, Discriminator
 from utils.utils import *
 
 # %%
