@@ -30,13 +30,14 @@ FID is a measure of similarity between two datasets of images. It was shown to c
 
 For the FID, I use the pytorch implement of this repository. [FID score for PyTorch](https://github.com/mseitzer/pytorch-fid)
 
-| Method | MNIST | cifar10 |
-| ---- | ---- | ---- |
-| attnG_wgandiv | 97.7207 | null | 
-| attnG_wgandiv_nobatch | NULL | NULL |
-| fullattn_wgangp_ori | 110.4787 | null | 
-| attnG_SND_wgandiv | null | null |
-| attnG_wgandiv_nosn | null | null |
+| Method | MNIST | FASHION-MNIST | cifar10 |
+| ---- | ---- | ---- | ---- |
+| attnG_SN_IN | 97.7207 | null |  251.2364 |
+| attnG_SN_noIN | shimizu | NULL | null |
+| attnG_noSN_IN | matsumoto_0 | matsumoto_0 | null |
+| attnG_SND_ING | nishio | hatano | null |
+
+<!-- | fullattn_wgangp_ori | 110.4787 | null | null | -->
 
 ## Reference
 1. [WGAN](https://arxiv.org/abs/1701.07875)

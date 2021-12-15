@@ -17,7 +17,8 @@ import numpy as np
 # from models.sagan import Generator, Discriminator
 # from models.sagan_div import Generator, Discriminator
 # from models.sagan_div_nobatch import Generator, Discriminator
-from models.sagan_div_SND import Generator, Discriminator
+from models.sagan_div_noSN_IN import Generator, Discriminator
+# from models.sagan_div_SND_ING import Generator, Discriminator
 from utils.utils import *
 
 # %%
@@ -43,7 +44,7 @@ class Trainer_sagan(object):
         self.clip_value = config.clip_value
 
         self.lambda_gp = config.lambda_gp
-        self.epochs = config.epochs
+        self.epochs = config.epochs + 1
         self.batch_size = config.batch_size
         self.num_workers = config.num_workers 
         self.g_lr = config.g_lr
@@ -54,13 +55,18 @@ class Trainer_sagan(object):
 
         self.dataset = config.dataset 
         self.use_tensorboard = config.use_tensorboard
+
         # path
         self.image_path = config.dataroot 
         self.log_path = config.log_path
         self.sample_path = config.sample_path
+        self.version = config.version
+        self.model_save_path = os.path.join(config.model_save_path, self.version)
+
+        # save step 
         self.log_step = config.log_step
         self.sample_step = config.sample_step
-        self.version = config.version
+        self.model_save_step = config.model_save_step
 
         # path with version
         self.log_path = os.path.join(config.log_path, self.version)
@@ -179,6 +185,18 @@ class Trainer_sagan(object):
                 # for the FID score
                 self.number = save_sample_one_image(self.sample_path, real_images, fake_images, epoch)
 
+            # save model checkpoint
+            if (epoch) % self.model_save_step == 0:
+                torch.save({
+                    'epoch': epoch,
+                    'G_state_dict': self.G.state_dict(),
+                    # 'G_optimizer_state_dict': self.g_optimizer.state_dict(),
+                    'g_loss': g_loss_fake,
+                    'D_state_dict': self.D.state_dict(),
+                    'd_loss': d_loss,
+                },
+                os.path.join(self.model_save_path, '{}.pth.tar'.format(epoch))
+                )
 
     def build_model(self):
 

@@ -82,17 +82,17 @@ class Generator(nn.Module):
     def forward(self, z, feat):
         mix_z = torch.matmul(z, feat[5])
         out = self.l1(mix_z) # (*, 1024, 2, 2)
-        mix_out_1 = torch.matmul(out, feat[4])
-        out = self.l2(mix_out_1) # (*, 512, 4, 4)
-        mix_out_2 = torch.matmul(out, feat[3])
-        out = self.l3(mix_out_2)
-        mix_out_3 = torch.matmul(out, feat[2])
-        out = self.l4(mix_out_3) # (*, 64, 32, 32)
-        mix_out_4 = torch.matmul(out, feat[1])
-        out = self.l5(mix_out_4)
-        mix_out_5 = torch.matmul(out, feat[0])
+        # mix_out_1 = torch.matmul(out, feat[4])
+        out = self.l2(out) # (*, 512, 4, 4)
+        # mix_out_2 = torch.matmul(out, feat[3])
+        out = self.l3(out)
+        # mix_out_3 = torch.matmul(out, feat[2])
+        out = self.l4(out) # (*, 64, 32, 32)
+        # mix_out_4 = torch.matmul(out, feat[1])
+        out = self.l5(out)
+        # mix_out_5 = torch.matmul(out, feat[0])
 
-        out = self.last(mix_out_5) # (*, 1, 64, 64)
+        out = self.last(out) # (*, 1, 64, 64)
 
         return out
 
