@@ -12,7 +12,7 @@ from utils.utils import *
 from dataset.dataset import getdDataset
 
 # set the gpu number
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 import argparse
 # %%
@@ -34,7 +34,7 @@ def get_parameters():
     parser.add_argument('--clip_value', type=float, default=0.01, help='lower and upper clip value for disc. weights, from the wgan')
 
     # Training setting
-    parser.add_argument('--epochs', type=int, default=10000, help='numer of epochs of training')
+    parser.add_argument('--epochs', type=int, default=10001, help='numer of epochs of training')
     parser.add_argument('--batch_size', type=int, default=64, help='batch size for the dataloader')
     parser.add_argument('--num_workers', type=int, default=2)
     # TTUR 
@@ -59,8 +59,8 @@ def get_parameters():
     parser.add_argument('--sample_path', type=str, default='./samples', help='the generated sample saved path')
 
     # Step size
-    parser.add_argument('--log_step', type=int, default=10, help='every default{10} epoch save to the log')
-    parser.add_argument('--sample_step', type=int, default=500, help='every default{100} epoch save the generated images and real images')
+    parser.add_argument('--log_step', type=int, default=100, help='every default{100} epoch save to the log')
+    parser.add_argument('--sample_step', type=int, default=500, help='every default{500} epoch save the generated images and real images')
     parser.add_argument('--model_save_step', type=int, default=500)
 
 

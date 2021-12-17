@@ -15,9 +15,9 @@ from torchvision.utils import save_image
 import numpy as np
 
 # from models.sagan import Generator, Discriminator
-# from models.sagan_div import Generator, Discriminator
-# from models.sagan_div_nobatch import Generator, Discriminator
-from models.sagan_div_noSN_IN import Generator, Discriminator
+from models.sagan_div_SN_IN import Generator, Discriminator
+# from models.sagan_div_SN_noIN import Generator, Discriminator
+# from models.sagan_div_noSN_IN import Generator, Discriminator
 # from models.sagan_div_SND_ING import Generator, Discriminator
 from utils.utils import *
 
@@ -61,7 +61,6 @@ class Trainer_sagan(object):
         self.log_path = config.log_path
         self.sample_path = config.sample_path
         self.version = config.version
-        self.model_save_path = os.path.join(config.model_save_path, self.version)
 
         # save step 
         self.log_step = config.log_step
@@ -71,6 +70,7 @@ class Trainer_sagan(object):
         # path with version
         self.log_path = os.path.join(config.log_path, self.version)
         self.sample_path = os.path.join(config.sample_path, self.version)
+        self.model_save_path = os.path.join(config.model_save_path, self.version)
 
         if self.use_tensorboard:
             self.build_tensorboard()
