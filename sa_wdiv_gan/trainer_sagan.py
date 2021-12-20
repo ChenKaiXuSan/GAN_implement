@@ -15,10 +15,10 @@ from torchvision.utils import save_image
 import numpy as np
 
 # from models.sagan import Generator, Discriminator
-from models.sagan_div_SN_IN import Generator, Discriminator
+# from models.sagan_div_SN_IN import Generator, Discriminator
 # from models.sagan_div_SN_noIN import Generator, Discriminator
 # from models.sagan_div_noSN_IN import Generator, Discriminator
-# from models.sagan_div_SND_ING import Generator, Discriminator
+from models.sagan_div_SND_ING import Generator, Discriminator
 from utils.utils import *
 
 # %%
