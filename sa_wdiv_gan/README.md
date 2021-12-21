@@ -32,8 +32,8 @@ For the FID, I use the pytorch implement of this repository. [FID score for PyTo
 
 | Method | MNIST | FASHION-MNIST | cifar10 |
 | ---- | ---- | ---- | ---- |
-| attnG_SN_IN | 97.7207 | matsumoto_1 |  251.2364 |
-| attnG_SN_noIN | 66.8447 | matsumoto_0 | null |
+| attnG_SN_IN | 86.7291688388309(5000epoch) | matsumoto_1 |  251.2364 |
+| attnG_SN_noIN | 59.876658265114486(9000epoch) | matsumoto_0 | null |
 | attnG_noSN_IN | matsumoto_0 | matsumoto_0 | null |
 | attnG_SND_ING | nishio | hatano | null |
 
